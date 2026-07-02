@@ -1,0 +1,225 @@
+/* ========================================================================== *
+ *  A precise, high-contrast data console.
+ *  Aesthetic: cool near-white canvas, pure-white surfaces, near-black ink,
+ *  crisp hairlines. One electric-cobalt accent does the talking; a single
+ *  amber signal marks data. Light, sharp, Swiss — the grid is the instrument,
+ *  everything else is calibration marks.
+ *  Type: Geist (UI/display) · Geist Mono (data + tracked micro-labels).
+ * ========================================================================== */
+
+:root {
+  /* cool neutral canvas + near-black ink (high contrast) */
+  --paper: #f5f6f8;
+  --paper-2: #eceef2;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --ink: #0d1117;
+  --ink-2: #3a4351;
+  --muted: #69727f;
+  --faint: #9aa3b0;
+
+  /* crisp cool hairlines */
+  --line: #e7e9ee;
+  --line-2: #d6dae1;
+
+  /* signature accent — electric cobalt (crisp on white) */
+  --accent: #2b5cf6;
+  --accent-600: #1f49d6;
+  --accent-deep: #1839ad;
+  --accent-soft: #dbe4fe;
+  --accent-softer: #eef3ff;
+  --accent-line: #bccbfb;
+  --accent-rgb: 43, 92, 246;
+
+  /* saturated semantics (used sparingly, high contrast) */
+  --sage: #16a34a;
+  --sage-deep: #15803d;
+  --sage-soft: #dcfce7;
+  --blue: #4f6275;
+  --blue-deep: #334155;
+  --blue-soft: #e8edf3;
+  --gold: #d97706;
+  --gold-deep: #92400e;
+  --gold-soft: #fcefc7;
+  --rose: #e5484d;
+  --rose-deep: #c1272d;
+  --rose-soft: #fdebec;
+  --rose-line: #f3c9cb;
+
+  /* themeable surfaces that were once hard-coded — overridden in dark mode */
+  --overlay-bg: rgba(245, 246, 248, 0.82);
+  --scroll-thumb: #c4cad4;
+  --scroll-thumb-hover: #aab2bf;
+  --col-type-bg: #dde1e8;
+
+  /* the data signal — a sky blue, kept a distinct hue from the cobalt accent
+     so the two read apart (and blend visibly where they cross) */
+  --signal: #0284c7;
+  --signal-deep: #075985;
+  --signal-soft: #e0f2fe;
+  --signal-line: #7dd3fc;
+  --signal-rgb: 2, 132, 199;
+
+  /* "this changed" highlight inside a cell */
+  --hit-bg: var(--signal-soft);
+  --hit-fg: var(--signal-deep);
+  --hit-line: rgba(var(--signal-rgb), 0.35);
+
+  /* affected-row emphasis (row matched the pattern) */
+  --matched-bg: rgba(var(--signal-rgb), 0.09);
+  --matched-bar: var(--signal);
+  --matched-bg-hover: rgba(var(--signal-rgb), 0.15);
+
+  /* row hover — deliberately stronger than a bare surface tint */
+  --row-hover: #e9edf4;
+
+  --r-xl: 14px;
+  --r-lg: 10px;
+  --r: 8px;
+  --r-sm: 6px;
+
+  --shadow-xs: 0 1px 2px rgba(13, 17, 23, 0.06);
+  --shadow-sm: 0 1px 2px rgba(13, 17, 23, 0.06), 0 2px 6px rgba(13, 17, 23, 0.05);
+  --shadow: 0 4px 12px rgba(13, 17, 23, 0.08), 0 14px 34px rgba(13, 17, 23, 0.09);
+  --shadow-pop: 0 16px 44px rgba(13, 17, 23, 0.2);
+
+  --sans: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --gutter-w: 58px;
+  --status-h: 34px;
+}
+
+/* ========================================================================== *
+ *  Dark theme — a straight inversion of the light "data console": neutral,
+ *  achromatic canvas + surfaces (no blue tint), near-white ink. The ONLY
+ *  colour is the functional two: electric cobalt for accents/buttons/selection,
+ *  and the amber data signal for affected rows. Everything else is greyscale.
+ * ========================================================================== */
+[data-theme="dark"] {
+  --paper: #0a0a0b;
+  --paper-2: #121213;
+  --surface: #161617;
+  --surface-2: #202022;
+  --ink: #f5f5f6;
+  --ink-2: #cbcbcd;
+  --muted: #8b8b8f;
+  --faint: #5c5c60;
+
+  --line: #262628;
+  --line-2: #38383b;
+
+  /* the accent — cobalt, kept vivid so it's the one thing that carries hue */
+  --accent: #4f7cff;
+  --accent-600: #6a91ff;
+  --accent-deep: #bccbff;
+  --accent-soft: #24304e;
+  --accent-softer: #191c26;
+  --accent-line: #33436e;
+  --accent-rgb: 79, 124, 255;
+
+  /* semantics kept desaturated so they don't compete with the accent */
+  --sage: #3fb950;
+  --sage-deep: #57d364;
+  --sage-soft: #14271a;
+  --blue: #9a9a9e;
+  --blue-deep: #bcbcc0;
+  --blue-soft: #1d1d1f;
+  --gold: #e3a72c;
+  --gold-deep: #f0c869;
+  --gold-soft: #2e2611;
+  --rose: #f0595e;
+  --rose-deep: #ff9499;
+  --rose-soft: #2e1a1c;
+  --rose-line: #572a2c;
+
+  --overlay-bg: rgba(10, 10, 11, 0.82);
+  --scroll-thumb: #38383b;
+  --scroll-thumb-hover: #48484c;
+  --col-type-bg: #2a2a2d;
+
+  /* data signal — a bright sky blue, distinct from the cobalt accent */
+  --signal: #38bdf8;
+  --signal-deep: #bae6fd;
+  --signal-soft: #0c2a3a;
+  --signal-line: #1e4a63;
+  --signal-rgb: 56, 189, 248;
+
+  --hit-bg: var(--signal-soft);
+  --hit-fg: var(--signal-deep);
+  --hit-line: rgba(var(--signal-rgb), 0.42);
+
+  --matched-bg: rgba(var(--signal-rgb), 0.1);
+  --matched-bar: var(--signal);
+  --matched-bg-hover: rgba(var(--signal-rgb), 0.17);
+
+  --row-hover: #26262a;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.55), 0 14px 34px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 16px 44px rgba(0, 0, 0, 0.65);
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv01", "ss01";
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+
+/* thin, neutral scrollbars */
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 9px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* shared micro-label: mono, tracked, uppercase — the "instrument" voice */
+.eyebrow,
+.import-kicker,
+.aux-label,
+.c-replace label,
+.pattern-strip .tag {
+  font-family: var(--mono);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+

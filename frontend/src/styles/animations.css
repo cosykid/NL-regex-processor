@@ -1,0 +1,106 @@
+/* ========================================================================== *
+ *  Animations
+ * ========================================================================== */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--accent-soft);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(var(--accent-rgb), 0.18);
+  }
+}
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* a calm inhale/exhale — sinusoidal easing so it never feels mechanical.
+   The 0%/100% frame is a pleasant resting glow, so reduced-motion (which
+   freezes the animation) leaves a steady cobalt aura rather than a blank. */
+@keyframes breathe {
+  0%,
+  100% {
+    scale: 0.92;
+    opacity: 0.55;
+  }
+  50% {
+    scale: 1.12;
+    opacity: 1;
+  }
+}
+/* slow roaming loops — the two orbs circulate in opposition, sweeping through
+   the centre from different sides so no region stays empty for long. Using the
+   `translate` property (not `transform`) lets the roam compose with `breathe`'s
+   `scale`. */
+@keyframes driftA {
+  0% {
+    translate: -16% -20%;
+  }
+  25% {
+    translate: 14% -10%;
+  }
+  50% {
+    translate: 20% 14%;
+  }
+  75% {
+    translate: -8% 20%;
+  }
+  100% {
+    translate: -16% -20%;
+  }
+}
+@keyframes driftB {
+  0% {
+    translate: 18% 16%;
+  }
+  25% {
+    translate: -14% 20%;
+  }
+  50% {
+    translate: -20% -12%;
+  }
+  75% {
+    translate: 10% -18%;
+  }
+  100% {
+    translate: 18% 16%;
+  }
+}
+@keyframes breatheGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px 1px rgba(var(--accent-rgb), 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px 7px rgba(var(--accent-rgb), 0.38);
+  }
+}
+@keyframes breatheText {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(var(--accent-rgb), 0);
+  }
+  50% {
+    text-shadow: 0 0 22px rgba(var(--accent-rgb), 0.35);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+

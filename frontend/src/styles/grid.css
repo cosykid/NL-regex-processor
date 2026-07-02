@@ -1,0 +1,583 @@
+/* ========================================================================== *
+ *  Grid area — the hero. A scroll pane for the current page of rows, with a
+ *  pager/jump/export toolbar pinned beneath it.
+ * ========================================================================== */
+.grid-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.grid-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+  position: relative; /* anchor for the detail panel on narrow viewports */
+}
+.grid-scroll {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  overflow: auto;
+  background: var(--paper);
+}
+
+/* lazy-loading footer under the grid when scrolling the original file */
+.grid-sentinel,
+.grid-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+}
+.grid-sentinel.err {
+  color: var(--rose-deep);
+}
+.grid-end {
+  font-variant-numeric: tabular-nums;
+  color: var(--faint);
+  border-top: 1px solid var(--line);
+}
+
+.grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  background: var(--surface);
+  min-width: 100%;
+}
+
+/* row-number gutter */
+.grid th.gutter,
+.grid td.gutter {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: var(--gutter-w);
+  min-width: var(--gutter-w);
+  max-width: var(--gutter-w);
+  text-align: right;
+  padding: 0 12px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+  background: var(--surface-2);
+  border-right: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+.grid thead th.gutter {
+  z-index: 4;
+  background: var(--paper-2);
+}
+
+/* gutter doubles as the row-expand affordance (Neon-style) */
+.grid tbody td.gutter .rn {
+  transition: opacity 0.12s;
+}
+.grid tbody tr:hover td.gutter {
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.grid tbody tr:hover td.gutter .rn {
+  opacity: 0.35;
+}
+.row-expand {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s, color 0.12s;
+}
+.row-expand svg {
+  width: 13px;
+  height: 13px;
+}
+.grid tbody tr:hover .row-expand {
+  opacity: 1;
+}
+.grid tbody tr.open .row-expand {
+  opacity: 1;
+  color: var(--accent);
+}
+.grid tbody tr.open td.gutter .rn {
+  opacity: 0.35;
+}
+
+/* column headers */
+.grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line-2);
+  border-right: 1px solid var(--line);
+  padding: 0;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.colhead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  cursor: pointer;
+  min-width: 130px;
+  transition: background 0.14s;
+  user-select: none;
+}
+.colhead:hover {
+  background: rgba(var(--accent-rgb), 0.06);
+}
+.col-type {
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--col-type-bg);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 600;
+}
+.col-name {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.col-check {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1.5px solid var(--line-2);
+  display: grid;
+  place-items: center;
+  color: transparent;
+  font-size: 11px;
+  transition: 0.14s;
+}
+.colhead:hover .col-check {
+  border-color: var(--faint);
+}
+
+/* targeted column */
+.grid th.target {
+  background: var(--accent-soft);
+  border-bottom: 2px solid var(--accent);
+}
+.grid th.target .col-name {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+.grid th.target .col-type {
+  background: var(--accent-line);
+  color: var(--accent-deep);
+}
+.grid th.target .col-check {
+  background: var(--accent);
+  border-color: var(--accent-600);
+  color: #fff;
+}
+.grid td.target {
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+/* body cells */
+.grid td {
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  max-width: 380px;
+}
+.grid td .cell {
+  display: block;
+  padding: 9px 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.grid td .cell.empty {
+  color: var(--faint);
+}
+.grid tbody tr:hover td {
+  background: var(--row-hover);
+  box-shadow: inset 0 1px 0 var(--line-2), inset 0 -1px 0 var(--line-2);
+}
+.grid tbody tr:hover td.gutter {
+  background: var(--row-hover);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--line-2), inset 0 -1px 0 var(--line-2),
+    inset 2px 0 0 var(--accent);
+}
+.grid tbody tr:hover td.target {
+  background: rgba(var(--accent-rgb), 0.13);
+}
+
+/* selected cell */
+.grid td.sel {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  background: var(--surface) !important;
+}
+.grid td.sel .cell {
+  color: var(--ink);
+}
+
+/* replaced-value emphasis — the amber data signal */
+.cell .hit {
+  background: var(--hit-bg);
+  color: var(--hit-fg);
+  border-radius: 3px;
+  padding: 0 3px;
+  box-shadow: inset 0 -1px 0 var(--hit-line);
+}
+
+/* affected rows — the pattern matched here (whether or not the text changed) */
+.grid tbody tr.matched td {
+  background: var(--matched-bg);
+}
+.grid tbody tr.matched td.gutter {
+  background: var(--matched-bg);
+  color: var(--signal-deep);
+  box-shadow: inset 3px 0 0 var(--matched-bar);
+}
+.grid tbody tr.matched:hover td {
+  background: var(--matched-bg-hover);
+}
+/* where an affected row crosses a targeted column, blend both signals: the
+   accent column-tint is layered over the signal row-tint for a genuine mix */
+.grid tbody tr.matched td.target {
+  background-color: var(--matched-bg);
+  background-image: linear-gradient(
+    rgba(var(--accent-rgb), 0.09),
+    rgba(var(--accent-rgb), 0.09)
+  );
+}
+.grid tbody tr.matched:hover td.target {
+  background-color: var(--matched-bg-hover);
+  background-image: linear-gradient(
+    rgba(var(--accent-rgb), 0.13),
+    rgba(var(--accent-rgb), 0.13)
+  );
+}
+
+/* the row whose full contents are open in the detail panel */
+.grid tbody tr.open td {
+  background: var(--accent-softer);
+  box-shadow: inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent);
+}
+.grid tbody tr.open:hover td {
+  background: var(--accent-softer);
+}
+.grid tbody tr.open td.gutter {
+  background: var(--accent-softer);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--accent), inset 0 -1px 0 var(--accent),
+    inset 3px 0 0 var(--accent);
+}
+.grid tbody tr.open td.target {
+  background: rgba(var(--accent-rgb), 0.14);
+}
+
+/* a brief pulse when you jump to a row */
+.grid tbody tr.flash td {
+  animation: rowFlash 1.6s ease-out;
+}
+@keyframes rowFlash {
+  0%,
+  30% {
+    background: var(--accent-soft);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+/* grid toolbar — affected-only · pager + jump · export */
+.grid-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -1px 2px rgba(13, 17, 23, 0.04);
+  z-index: 5;
+  /* Wrap decisions key off the toolbar's own width, not the viewport —
+     the sidebar can leave the toolbar cramped while the window is still wide. */
+  container-type: inline-size;
+}
+.gt-left,
+.gt-right {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  /* Never shrink below the (nowrap) toggle/export inside, or they overflow
+     and overlap the centre pager. */
+  min-width: max-content;
+}
+.gt-right {
+  justify-content: flex-end;
+}
+.gt-pager {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* affected-only toggle */
+.affect-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  padding: 6px 10px 6px 9px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  cursor: pointer;
+  transition: 0.14s;
+  white-space: nowrap;
+}
+.affect-toggle:not(:disabled):hover {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+}
+.affect-toggle.on {
+  border-color: var(--signal);
+  background: var(--signal-soft);
+  color: var(--signal-deep);
+}
+.affect-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.affect-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--matched-bar);
+  box-shadow: inset 3px 0 0 var(--matched-bar);
+  flex: 0 0 auto;
+}
+.affect-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding-left: 2px;
+}
+.affect-toggle.on .affect-count {
+  color: var(--signal-deep);
+}
+
+/* pager */
+.pg-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.14s;
+}
+.pg-btn:not(:disabled):hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-softer);
+}
+.pg-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pg-range {
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 132px;
+  text-align: center;
+}
+.pg-range b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.pg-range .pg-of {
+  color: var(--faint);
+}
+.pg-jump {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: 4px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+}
+.pg-jump label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.pg-jump input {
+  width: 78px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color 0.14s, box-shadow 0.14s;
+}
+.pg-jump input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-softer);
+}
+.pg-go {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: 0.14s;
+}
+.pg-go:not(:disabled):hover {
+  background: var(--accent-soft);
+}
+.pg-go:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* export */
+.export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  color: var(--ink);
+  padding: 7px 13px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  cursor: pointer;
+  transition: 0.14s;
+  white-space: nowrap;
+}
+.export-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+  background: var(--accent-softer);
+}
+.export-btn svg {
+  width: 15px;
+  height: 15px;
+}
+.export-menu {
+  position: relative;
+}
+.export-caret {
+  width: 13px !important;
+  height: 13px !important;
+  margin-left: -2px;
+  opacity: 0.55;
+}
+/* Opens upward — the toolbar sits at the foot of the grid, so a downward
+   popover would fall off-screen. */
+.export-pop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 170px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-pop);
+  z-index: 20;
+}
+.export-item {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: 0.12s;
+}
+.export-item:hover {
+  background: var(--accent-softer);
+  color: var(--accent-deep);
+}
+.export-item.disabled {
+  display: block;
+  color: var(--faint);
+  cursor: not-allowed;
+}
+.export-item.disabled:hover {
+  background: none;
+  color: var(--faint);
+}
+.export-hint {
+  margin: 2px 0 0;
+  padding: 0 10px 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+

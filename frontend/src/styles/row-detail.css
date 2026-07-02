@@ -1,0 +1,278 @@
+/* ========================================================================== *
+ *  Row detail — the right-hand inspector (open a row to read it in full)
+ * ========================================================================== */
+.row-detail {
+  flex: 0 0 360px;
+  width: 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line-2);
+  box-shadow: -10px 0 30px -22px rgba(0, 0, 0, 0.55);
+  animation: rdIn 0.18s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes rdIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rd-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+}
+.rd-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.rd-eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+.rd-num {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.rd-badge {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--signal-deep);
+  background: var(--signal-soft);
+  border: 1px solid var(--signal);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.rd-close {
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  transition: 0.14s;
+}
+.rd-close:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+
+.rd-fields {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.rd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rd-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rd-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rd-field.target .rd-name {
+  color: var(--accent-deep);
+}
+.rd-tdot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.rd-type {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+.rd-value {
+  position: relative;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  padding: 9px 11px;
+  min-height: 38px;
+  display: flex;
+  align-items: flex-start;
+}
+.rd-field.target .rd-value {
+  border-left: 2px solid var(--accent);
+}
+.rd-val-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+.rd-value.empty .rd-val-text {
+  color: var(--faint);
+}
+.rd-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: 0.12s;
+}
+.rd-value:hover .rd-copy,
+.rd-copy:focus-visible {
+  opacity: 1;
+}
+.rd-copy:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.rd-copy svg {
+  width: 13px;
+  height: 13px;
+}
+.rd-foot {
+  flex: 0 0 auto;
+  padding: 12px 15px;
+  border-top: 1px solid var(--line);
+}
+
+/* overlays for non-success run states */
+.grid-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--overlay-bg);
+  backdrop-filter: blur(3px);
+}
+.state-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow);
+  padding: 30px 32px;
+  max-width: 460px;
+  width: 100%;
+  text-align: center;
+}
+.state-card .ico {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 16px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+}
+.ico.run {
+  background: var(--accent-softer);
+  color: var(--accent-deep);
+}
+.ico.fail {
+  background: var(--rose-soft);
+  color: var(--rose-deep);
+}
+.ico.cancel {
+  background: var(--gold-soft);
+  color: var(--gold-deep);
+}
+.state-card h3 {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.state-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.state-card .stage {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent-deep);
+  margin-top: 10px;
+}
+.state-progress {
+  height: 8px;
+  background: var(--paper-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 18px 0 6px;
+}
+.state-progress > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.5s ease;
+}
+.state-pct {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+

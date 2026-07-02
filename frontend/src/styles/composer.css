@@ -1,0 +1,261 @@
+/* ========================================================================== *
+ *  Composer — describe a find/replace
+ * ========================================================================== */
+.composer {
+  flex: 0 0 auto;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  box-shadow: var(--shadow-xs);
+  position: relative;
+  z-index: 10;
+}
+.composer-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 10px 12px;
+}
+.c-lead {
+  flex: 0 0 auto;
+  width: 40px;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+.c-lead svg {
+  width: 18px;
+  height: 18px;
+}
+.c-fields {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.c-fields:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-softer);
+}
+.c-prompt {
+  flex: 1;
+  min-width: 0;
+}
+.c-prompt input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--sans);
+  font-size: 15px;
+  color: var(--ink);
+  padding: 13px 16px;
+  letter-spacing: -0.01em;
+}
+.c-prompt input::placeholder {
+  color: var(--faint);
+}
+.c-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin: 8px 0;
+}
+.c-replace {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 16px;
+}
+.c-replace .arrow {
+  color: var(--faint);
+  font-size: 15px;
+}
+.c-replace label {
+  font-size: 9.5px;
+  color: var(--faint);
+}
+.c-replace input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent-deep);
+  width: 140px;
+  padding: 13px 0;
+}
+.c-replace input::placeholder {
+  color: var(--faint);
+}
+.run-btn {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  border: 1px solid var(--accent-600);
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  padding: 0 20px;
+  border-radius: var(--r);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  transition: background 0.16s, box-shadow 0.16s, transform 0.06s;
+  box-shadow: 0 1px 2px rgba(var(--accent-rgb), 0.35);
+}
+.run-btn:not(:disabled):hover {
+  background: var(--accent-600);
+  box-shadow: 0 6px 16px -6px rgba(var(--accent-rgb), 0.65);
+}
+.run-btn:not(:disabled):active {
+  transform: translateY(1px);
+}
+.run-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.run-btn .kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.85;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* second row: targets + examples */
+.composer-aux {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 14px 12px 52px;
+  font-size: 12px;
+  min-height: 38px;
+  flex-wrap: wrap;
+}
+.aux-label {
+  font-size: 9.5px;
+  color: var(--faint);
+}
+.targets-inline {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.tchip {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 7px 3px 9px;
+  border-radius: var(--r-sm);
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-line);
+  color: var(--accent-deep);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tchip button {
+  border: none;
+  background: none;
+  color: var(--accent-deep);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.55;
+  padding: 0;
+}
+.tchip button:hover {
+  opacity: 1;
+}
+.targets-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.aux-spacer {
+  flex: 1;
+}
+.examples {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ex {
+  font-size: 11.5px;
+  padding: 4px 11px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: 0.14s;
+  white-space: nowrap;
+}
+.ex:hover {
+  border-color: var(--accent);
+  color: var(--accent-deep);
+  background: var(--accent-softer);
+}
+
+/* resolved-pattern strip */
+.pattern-strip {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 16px 9px 52px;
+  background: var(--surface-2);
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  overflow: hidden;
+}
+.pattern-strip .tag {
+  font-size: 9.5px;
+  color: var(--accent);
+  flex: 0 0 auto;
+}
+.pattern-strip code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--accent-deep);
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+  flex: 0 1 auto;
+}
+.pattern-strip .expl {
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  flex: 0 1 auto;
+}
+
+/* progress (running) */
+.run-progress {
+  height: 2px;
+  background: transparent;
+  overflow: hidden;
+}
+.run-progress > i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.5s ease;
+}
+

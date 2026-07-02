@@ -1,0 +1,55 @@
+/* ========================================================================== *
+ *  Theme toggle — docked in the status bar (workspace) or floated top-right
+ *  on the standalone import / loading screens.
+ * ========================================================================== */
+.theme-toggle {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color 0.14s, background 0.14s, color 0.14s;
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-softer);
+}
+.theme-toggle svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* Floated on the import / loading screens, which have no status bar. */
+.theme-toggle.floating {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: 34px;
+  height: 34px;
+  z-index: 30;
+}
+
+/* Docked at the right edge of the status bar. Compact and borderless so it
+   reads as part of the bar rather than a floating control. */
+.theme-toggle.sb-toggle {
+  width: 30px;
+  height: 24px;
+  margin-left: 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+.theme-toggle.sb-toggle:hover {
+  color: var(--accent);
+  background: var(--accent-softer);
+  border-color: transparent;
+}
+.theme-toggle.sb-toggle svg {
+  width: 15px;
+  height: 15px;
+}
+

@@ -1,0 +1,44 @@
+/* ========================================================================== *
+ *  Responsive — collapse the rail on narrow viewports
+ * ========================================================================== */
+@media (max-width: 880px) {
+  .sidebar {
+    display: none;
+  }
+  .c-replace input {
+    width: 96px;
+  }
+}
+/* When the toolbar itself gets too narrow for one row, drop the pager to its
+   own centred line instead of letting the side sections overlap it. */
+@container (max-width: 860px) {
+  .gt-pager {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+@media (max-width: 820px) {
+  /* the detail panel overlays the grid rather than squeezing it */
+  .row-detail {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    flex-basis: auto;
+    width: min(360px, 92%);
+    z-index: 15;
+    box-shadow: var(--shadow-pop);
+  }
+}
+@media (max-width: 580px) {
+  .composer-aux .examples {
+    display: none;
+  }
+  .run-btn .kbd {
+    display: none;
+  }
+  .c-replace {
+    display: none;
+  }
+}

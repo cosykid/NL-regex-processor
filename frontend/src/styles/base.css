@@ -1,0 +1,83 @@
+/* ========================================================================== *
+ *  Shared: buttons, alerts, spinner, links
+ * ========================================================================== */
+.btn {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 9px 15px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+  transition: 0.14s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn:hover {
+  border-color: var(--faint);
+  background: var(--surface-2);
+}
+.btn.block {
+  width: 100%;
+}
+.btn.tiny {
+  padding: 6px 11px;
+  font-size: 12px;
+}
+.btn.danger {
+  color: var(--rose-deep);
+  border-color: var(--rose-soft);
+}
+.btn.danger:hover {
+  border-color: var(--rose);
+  background: var(--rose-soft);
+}
+.linkish {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 0;
+}
+.linkish:hover {
+  text-decoration: underline;
+}
+
+.alert {
+  margin: 14px 0 0;
+  padding: 11px 14px;
+  border-radius: var(--r);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: left;
+}
+.alert.error {
+  background: var(--rose-soft);
+  color: var(--rose-deep);
+  border: 1px solid var(--rose-line);
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.spinner.lg {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+.run-btn .spinner {
+  border-color: rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+}
+
