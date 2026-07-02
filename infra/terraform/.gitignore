@@ -1,0 +1,15 @@
+# Local Terraform state + working dirs — never commit these.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Variable files may contain account-specific values / secrets.
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+
+# Plan output can contain secrets.
+*.tfplan

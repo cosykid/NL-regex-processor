@@ -1,0 +1,35 @@
+# Copy to terraform.tfvars and adjust. All values have sensible defaults, so an
+# empty tfvars works too — this just documents the common knobs.
+
+region      = "ap-southeast-2"
+name_prefix = "nl-regex-processor"
+environment = "dev"
+
+# Leave empty to auto-generate a globally-unique name; set to pin an exact one.
+# bucket_name = "my-company-nl-regex-dev"
+
+# --- dev vs prod ---
+# Local development: keep true to get static access keys in the outputs.
+# Deployed environments: set false and attach app_role_arn to your compute.
+create_dev_user = true
+
+# Dev convenience only — lets `terraform destroy` wipe a non-empty bucket.
+# NEVER set true for prod.
+force_destroy = false
+
+# --- data protection ---
+enable_versioning                  = true
+sse_algorithm                      = "AES256" # or "aws:kms" (+ kms_key_arn)
+noncurrent_version_expiration_days = 30
+abort_incomplete_multipart_days    = 7
+
+# Optional TTLs on user data (0 = keep forever).
+# uploads_expiration_days = 30
+# results_expiration_days = 7
+
+# --- deployed trust (only relevant when create_dev_user = false) ---
+# trusted_role_services = ["ecs-tasks.amazonaws.com", "ec2.amazonaws.com"]
+#
+# EKS IRSA example:
+# oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/oidc.eks.ap-southeast-2.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"
+# oidc_subjects     = ["system:serviceaccount:default:nl-regex"]

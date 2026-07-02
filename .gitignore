@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+
+# Django
+backend/staticfiles/
+*.sqlite3
+
+# Data / runtime artifacts — local-mode output only (s3 mode uses a bucket).
+# No /data dir is committed; ignore anything a local run might drop there.
+/data/*
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store
+Icon?

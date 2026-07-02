@@ -1,0 +1,63 @@
+# Development overlay — live source, no image rebuilds.
+#
+# Use it explicitly on top of the base file (it is NOT auto-applied, so the
+# plain `docker compose up --build` stays the production-like stack):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# What it changes versus the base stack:
+#   • backend  — mounts ./backend and runs gunicorn with --reload, which
+#                hot-reloads on save (no rebuild, no restart). We use gunicorn
+#                rather than `runserver` because runserver's autoreloader takes
+#                the whole container down with a native SIGABRT ("terminate
+#                called without an active exception") when it restarts a process
+#                that has already loaded DuckDB / py4j (the JVM bridge). With
+#                gunicorn the arbiter never imports the app — only workers do —
+#                so a worker that aborts on reload is simply respawned and the
+#                container stays up. `--reload-engine=poll` is required because
+#                inotify does not see host edits through the macOS bind mount.
+#   • worker   — mounts ./backend so a quick `docker compose restart worker`
+#                picks up Celery/Spark edits in ~3s (Celery imports tasks at
+#                start, so it needs a restart — but never a rebuild).
+#   • frontend — runs the Vite dev server (hot module reload) instead of the
+#                built nginx bundle; edits appear instantly in the browser.
+#
+# You only ever need `--build` again when DEPENDENCIES change
+# (backend/requirements.txt or frontend/package.json) — not for code edits.
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    environment:
+      DJANGO_DEBUG: "True"
+    command:
+      - sh
+      - -c
+      - >
+        python manage.py migrate --noinput &&
+        exec gunicorn config.wsgi:application
+        --bind 0.0.0.0:8000
+        --workers 2
+        --timeout 300
+        --reload
+        --reload-engine=poll
+
+  worker:
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    image: node:20-bookworm-slim
+    working_dir: /app
+    command: ["sh", "-c", "npm install && npm run dev -- --host 0.0.0.0 --port 80"]
+    environment:
+      BACKEND_ORIGIN: http://backend:8000
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+    ports:
+      - "8080:80"
+
+volumes:
+  frontend_node_modules:

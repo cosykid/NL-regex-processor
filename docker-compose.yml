@@ -1,0 +1,117 @@
+# Full stack: web API, Celery worker(s), Redis, React frontend.
+# The database is Neon (serverless Postgres) — set DATABASE_URL in .env.
+# Optional profiles:
+#   --profile cluster        adds a standalone Spark master + worker
+#   --profile observability  adds Flower (Celery monitoring)
+#
+#   docker compose up --build                       # core stack (Spark local mode)
+#   docker compose --profile cluster up --build     # + standalone Spark cluster
+#   docker compose --profile observability up        # + Flower on :5555
+
+x-backend-env: &backend-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-insecure-change-me}
+  DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+  # Neon is the database. Paste your Neon connection string into .env as
+  # DATABASE_URL (or NEON_DATABASE_URL); TLS is applied automatically. There is
+  # no local Postgres container — the web + worker talk straight to Neon.
+  DATABASE_URL: ${DATABASE_URL:-}
+  NEON_DATABASE_URL: ${NEON_DATABASE_URL:-}
+  REDIS_URL: redis://redis:6379
+  DATA_DIR: /data
+  # Object storage. STORAGE_BACKEND=s3 (in use) writes to the bucket below and
+  # nothing touches /data. STORAGE_BACKEND=local would fall back to /data — now
+  # container-local (non-persistent) storage, since the shared volume is gone.
+  # Credentials come from the default AWS chain — static keys here for local
+  # dev, an IAM role once deployed.
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_REGION: ${S3_REGION:-ap-southeast-2}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+  AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-claude-haiku-4-5}
+  SPARK_MASTER_URL: ${SPARK_MASTER_URL:-local[*]}
+  SPARK_ROWS_PER_PARTITION: ${SPARK_ROWS_PER_PARTITION:-200000}
+
+services:
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    command: ["web"]
+    environment: *backend-env
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build: ./backend
+    command: ["worker"]
+    environment:
+      <<: *backend-env
+      # Set SPARK_DRIVER_HOST=worker in .env when using the cluster profile so
+      # standalone executors can reach the driver running in this container.
+      SPARK_DRIVER_HOST: ${SPARK_DRIVER_HOST:-}
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-2}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  # --- optional: standalone Spark cluster (profile: cluster) ---
+  spark-master:
+    image: apache/spark:3.5.1
+    profiles: ["cluster"]
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master"]
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+    ports:
+      - "8090:8080"  # Spark master UI
+      - "7077:7077"
+
+  spark-worker:
+    image: apache/spark:3.5.1
+    profiles: ["cluster"]
+    command:
+      ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker",
+       "spark://spark-master:7077"]
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_CORES: ${SPARK_WORKER_CORES:-2}
+      SPARK_WORKER_MEMORY: ${SPARK_WORKER_MEMORY:-2g}
+    depends_on:
+      - spark-master
+
+  # --- optional: Celery monitoring (profile: observability) ---
+  flower:
+    build: ./backend
+    command: ["flower"]
+    profiles: ["observability"]
+    environment: *backend-env
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
