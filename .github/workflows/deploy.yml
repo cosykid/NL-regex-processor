@@ -58,10 +58,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       # The image's entrypoint execs any unknown command, so pytest runs with
-      # the exact runtime deps (JRE, Spark jars) that production ships.
+      # the exact runtime deps (JRE, Spark jars) that production ships. The
+      # checkout is bind-mounted over /app because the production image
+      # deliberately excludes tests/ (see backend/.dockerignore).
       - name: pytest
         run: |
           docker run --rm --network host \
+            -v "$PWD/backend:/app" \
             -e DATABASE_URL='${{ secrets.TEST_DATABASE_URL }}' \
             -e REDIS_URL='redis://localhost:6379' \
             -e DJANGO_SECRET_KEY='ci-only-not-secret' \
