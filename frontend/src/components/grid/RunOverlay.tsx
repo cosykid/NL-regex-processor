@@ -19,8 +19,8 @@ export default function RunOverlay({ run, error, onCancel }: Props) {
   if (error) {
     return (
       <div className="grid-overlay">
-        <div className="state-card">
-          <div className="ico fail">!</div>
+        <div className="state-card" role="alert">
+          <div className="ico fail" aria-hidden="true">!</div>
           <h3>Couldn’t load the results</h3>
           <p>{error}</p>
         </div>
@@ -31,8 +31,8 @@ export default function RunOverlay({ run, error, onCancel }: Props) {
   if (!TERMINAL.has(run.status)) {
     return (
       <div className="grid-overlay">
-        <div className="state-card">
-          <div className="ico run">
+        <div className="state-card" role="status">
+          <div className="ico run" aria-hidden="true">
             <div className="spinner lg" />
           </div>
           <h3>Working through your data</h3>
@@ -63,8 +63,8 @@ export default function RunOverlay({ run, error, onCancel }: Props) {
   if (run.status === "FAILED") {
     return (
       <div className="grid-overlay">
-        <div className="state-card">
-          <div className="ico fail">✕</div>
+        <div className="state-card" role="alert">
+          <div className="ico fail" aria-hidden="true">✕</div>
           <h3>This didn’t work</h3>
           <p>{run.error_message || "The change couldn’t be completed."}</p>
         </div>
@@ -75,8 +75,8 @@ export default function RunOverlay({ run, error, onCancel }: Props) {
   if (run.status === "CANCELLED") {
     return (
       <div className="grid-overlay">
-        <div className="state-card">
-          <div className="ico cancel">⊘</div>
+        <div className="state-card" role="status">
+          <div className="ico cancel" aria-hidden="true">⊘</div>
           <h3>Cancelled</h3>
           <p>This change was cancelled before it finished.</p>
         </div>

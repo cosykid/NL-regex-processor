@@ -5,7 +5,12 @@ through the frontend proxy). All bodies are JSON unless noted. IDs are UUIDs.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| `POST` | `/api/uploads` | Upload a CSV/Excel file (multipart) |
+| `POST` | `/api/uploads` | Upload a CSV/Excel file (multipart POST through the API) |
+| `POST` | `/api/uploads/presign` | Start a direct-to-storage upload (S3 backend) |
+| `POST` | `/api/uploads/complete` | Finalize a single-PUT direct upload |
+| `POST` | `/api/uploads/multipart/create` | Open a parallel multipart upload (large files) |
+| `POST` | `/api/uploads/multipart/complete` | Finalize a multipart upload |
+| `POST` | `/api/uploads/multipart/abort` | Cancel an in-progress multipart upload |
 | `GET`  | `/api/uploads/{id}` | Upload metadata |
 | `GET`  | `/api/uploads/{id}/rows` | Scroll the original file — a cursor-paged window of raw rows |
 | `POST` | `/api/jobs` | Create a job (dispatch async work) |
@@ -56,6 +61,131 @@ curl -F file=@samples/contacts.csv http://localhost:8000/api/uploads
 > persisted, so `GET /api/uploads/{id}` omits it. Use `/rows` to page the file.
 
 **400** — no `file` field, an unparseable file, or no header row.
+
+---
+
+## Direct-to-storage uploads
+
+On the **S3 backend** the browser uploads straight to the bucket via presigned
+URLs — the file's bytes never pass through the web process. The server only
+decides the storage key + kind (the client echoes back an opaque `id`) and later
+reads the header. On the **local backend** there's no browser-reachable target,
+so `presign` returns `{"mode": "direct"}` and the client falls back to
+`POST /api/uploads`.
+
+Two shapes, chosen by size:
+
+- **Small files** — one presigned `PUT` (`presign` → `PUT` → `complete`).
+- **Large files** (client threshold **16 MB**) — a **parallel multipart** upload
+  (`multipart/create` → parallel part `PUT`s → `multipart/complete`). One `PUT`
+  can't saturate a high-latency uplink (a single TCP stream is capped by its
+  bandwidth-delay product; the bucket is in `ap-southeast-2`/Sydney), so the file
+  is sliced and the parts are uploaded concurrently (a pool of ~6) to lift total
+  throughput.
+
+Both paths need bucket CORS to allow `PUT`; multipart additionally needs the
+`ETag` response header **CORS-exposed** (each part's ETag is read client-side and
+handed to `complete`). `infra/terraform/s3.tf` sets `allowed_methods = [GET, PUT,
+HEAD]` and `expose_headers = ["ETag"]`.
+
+**Throughput characteristics** — the multipart win is not universal; it's a
+bandwidth-delay-product effect, so it only shows under specific conditions:
+
+- **High-RTT links only.** Single-stream throughput ≈ `TCP_window / RTT`. When
+  the round-trip is large (e.g. a client in the US/EU → the Sydney bucket,
+  ~150–250 ms) one `PUT` can't fill the pipe and the parallel parts lift total
+  throughput ~2–5×. A client **near** the bucket (low RTT, e.g. within Australia)
+  already saturates the uplink with a single stream, so multipart there is
+  expected to be ~1× — working as designed, not a regression.
+- **Needs HTTP/1.1.** The parallel parts only get *independent* TCP congestion
+  windows over HTTP/1.1 (the browser opens up to ~6 sockets per host). S3's REST
+  endpoint is HTTP/1.1. Put a CloudFront/ALB in front that negotiates HTTP/2 and
+  the parts multiplex over one connection = one congestion window = the BDP cap
+  returns and the gain disappears. Check the Protocol column in DevTools.
+- **Request count = `ceil(size / part_size)`.** Each part is its own `PUT`, so a
+  large file shows many same-named rows in the Network panel (they differ only by
+  the `?partNumber=` query). That's the mechanism, not a leak — see the part-size
+  formula under `multipart/create`.
+
+### POST /api/uploads/presign
+
+**Request** — `{"filename": "contacts.csv"}`.
+
+**200** — S3 backend: `{"mode": "s3", "id": "<uuid>", "url": "<presigned PUT>"}`.
+Local backend: `{"mode": "direct"}` (fall back to `POST /api/uploads`).
+
+### POST /api/uploads/complete
+
+Finalizes a single-PUT direct upload: looks up the pending record stashed at
+presign time (so the client can't dictate the key or kind), reads the header, and
+records it.
+
+**Request** — `{"id": "<uuid from presign>"}`.
+**201** — same body as `POST /api/uploads`.
+**410** — the upload session expired or the id is unknown.
+
+### POST /api/uploads/multipart/create
+
+Opens a multipart upload and returns a presigned URL per part. The server picks
+the part size — `part_size = max(5 MB, ceil(size / 64))`, capped at 10000 parts
+(S3's limits: every part but the last is ≥ 5 MB, ≤ 10000 parts). The client
+slices the file into `part_size` chunks and PUTs each to its `url` in parallel.
+
+**Request** — `{"filename": "big.csv", "size": 734003200}` (`size` in bytes).
+
+**200**
+
+```json
+{
+  "id": "0f728241-eb66-4fbb-a717-71203de3f634",
+  "part_size": 11468800,
+  "parts": [
+    {"part_number": 1, "url": "https://<bucket>.s3.../uploads/<id>.csv?partNumber=1&uploadId=..."},
+    {"part_number": 2, "url": "https://..."}
+  ]
+}
+```
+
+| Field | Notes |
+|-------|-------|
+| `id` | Opaque upload id; echo it back to `complete`/`abort`. |
+| `part_size` | Bytes per part. Part `n` (1-based) covers `[(n-1)·part_size, …)`. |
+| `parts` | One `{part_number, url}` per part, ascending. |
+
+**400** — missing `filename`, or a missing/non-positive `size`.
+
+### POST /api/uploads/multipart/complete
+
+Assembles the uploaded parts into the final object (from the server-held S3
+upload id — never the client's), reads the header, and records it. Send back each
+part's `ETag` (read from the part `PUT` response). Order doesn't matter; the
+server sorts by `part_number`.
+
+**Request**
+
+```json
+{
+  "id": "0f728241-...",
+  "parts": [
+    {"part_number": 1, "etag": "\"e1a...\""},
+    {"part_number": 2, "etag": "\"9c4...\""}
+  ]
+}
+```
+
+**201** — same body as `POST /api/uploads`.
+**400** — an invalid/empty `parts` payload, or the assembled file is unparseable
+/ over the size limit.
+**410** — the upload session expired or the id is unknown.
+
+### POST /api/uploads/multipart/abort
+
+Discards an in-progress multipart upload so already-uploaded parts don't linger
+(a bucket lifecycle rule is the backstop). The client calls this on cancel or an
+unrecoverable part failure.
+
+**Request** — `{"id": "<uuid>"}`.
+**204** — aborted (or a no-op for an unknown/already-cleared id; idempotent).
 
 ---
 
@@ -139,8 +269,9 @@ job id (status `QUEUED`). Does not block on the LLM or Spark.
 |-------|------|----------|-------|
 | `uploaded_file` | uuid | yes | An existing upload id |
 | `nl_prompt` | string | yes | Natural-language description of the pattern |
-| `replacement_value` | string | no | Defaults to `""` (blank = delete matches) |
+| `replacement_value` | string | no | Only read by `replace` (blank = delete matches) and `mask` (blank = default `••••` token). Defaults to `""` |
 | `target_columns` | string[] | yes | Must be a subset of the upload's columns |
+| `action` | string | no | `auto` (default), `find`, `replace`, `mask`, `extract`, `keep`, `drop`. `auto` infers the action (and any value) from the prompt; `find` only counts/flags matches — the data passes through unchanged |
 
 ```bash
 curl -X POST http://localhost:8000/api/jobs -H 'Content-Type: application/json' \
@@ -243,7 +374,7 @@ curl "http://localhost:8000/api/jobs/<id>/results?page=1&matched_only=true"
 |-------|-------|
 | `columns` | display columns (the internal match-flag column is hidden) |
 | `rows[].__matched__` | per-row flag: did the pattern match this row? (`true` even when the replacement didn't change the text) |
-| `rows[].__rownum` | the row's **original 1-based index** in the full result — preserved under `matched_only`, so an affected row keeps its full-view number instead of being renumbered. Assigned by DuckDB `row_number()` over a single-threaded (deterministic) scan. |
+| `rows[].__rownum` | the row's **original 1-based index** in the full result — preserved under `matched_only`, so an affected row keeps its full-view number instead of being renumbered. Ordering is deterministic via the Parquet scan position (file name, then row within file): the full view numbers rows positionally from the page offset, the affected-only view numbers every row first and then filters. |
 | `total` | rows in the current view (the affected subset when `matched_only`) |
 | `total_all` | total rows in the result, ignoring the filter |
 | `matched_total` | number of affected rows |
@@ -302,9 +433,19 @@ Returned by the job create / detail / list / cancel endpoints.
   "nl_prompt": "Find email addresses",
   "replacement_value": "REDACTED",
   "target_columns": ["Email"],
+  "action": "auto",
+  "resolved_action": "replace",
   "status": "SUCCESS",
   "progress": 100,
   "stage": "completed",
+  "predicates": [
+    {
+      "column": "Email",
+      "pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,7}\\b",
+      "explanation": "Matches email addresses."
+    }
+  ],
+  "combinator": "all",
   "regex_pattern": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,7}\\b",
   "regex_source": "llm",
   "regex_explanation": "Matches email addresses.",
@@ -317,11 +458,21 @@ Returned by the job create / detail / list / cancel endpoints.
 }
 ```
 
+The request shape is unchanged — one `nl_prompt`, `target_columns`, and an
+optional `replacement_value`. A cross-column description like `"name starts with
+A and phone starts with 0"` over `target_columns: ["name", "phone"]` resolves to
+two `predicates` with `combinator: "all"` (AND); use "or" in the prompt for
+`"any"`.
+
 | Field | Type | Notes |
 |-------|------|-------|
 | `status` | enum | `QUEUED` · `RUNNING` · `SUCCESS` · `FAILED` · `CANCELLED` |
 | `progress` | int | 0–100 |
-| `stage` | string | Human-readable current step (e.g. `applying replacement (Spark write)`) |
+| `stage` | string | Human-readable current step (e.g. `applying replace (Spark write)`) |
+| `action` | enum | The requested output action (`auto` · `find` · `replace` · `mask` · `extract` · `keep` · `drop`) |
+| `resolved_action` | enum | The concrete action that actually ran — what `auto` resolved to (never `auto`; empty until the conditions are resolved) |
+| `predicates` | array | Per-column match conditions `{column, pattern, explanation}` (empty until resolved) |
+| `combinator` | enum | `all` (AND) · `any` (OR) |
 | `regex_source` | enum | `cache` · `llm` · `heuristic` (empty until resolved) |
 | `total_rows` / `matched_rows` | int \| null | Populated on success |
 | `error_message` | string | Populated on `FAILED` |

@@ -5,8 +5,10 @@
   .sidebar {
     display: none;
   }
+  /* the 30ch floor would out-rank a bare `width` on a flex item — lower the
+     floor itself so the prompt keeps room */
   .c-replace input {
-    width: 96px;
+    min-width: 12ch;
   }
 }
 /* When the toolbar itself gets too narrow for one row, drop the pager to its
@@ -38,7 +40,17 @@
   .run-btn .kbd {
     display: none;
   }
+  /* keep the action picker reachable — drop only the value box + arrow */
+  .c-replace input,
+  .c-replace .arrow {
+    display: none;
+  }
   .c-replace {
+    padding: 0 10px;
+  }
+  /* the status bar can't fit every segment — shed the cell ref and pager */
+  .sb-item.mono,
+  .sb-item.tail {
     display: none;
   }
 }

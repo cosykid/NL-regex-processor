@@ -70,10 +70,12 @@ required.
 
 - **More throughput:** raise `CELERY_CONCURRENCY` and/or run more worker
   replicas. Each worker process runs its own Spark driver, so size memory
-  accordingly.
-- **Bigger jobs:** tune `SPARK_ROWS_PER_PARTITION` (smaller = more parallelism,
-  more task overhead) and, on the cluster profile, `SPARK_WORKER_CORES` /
-  `SPARK_WORKER_MEMORY`.
+  accordingly. With `SPARK_WARMUP` on (default), every child boots its JVM at
+  worker start — expect `CELERY_CONCURRENCY` JVMs warming up front, and a few
+  extra seconds before the worker reports ready.
+- **Bigger jobs:** tune `spark.sql.files.maxPartitionBytes` (smaller = more
+  splits = more parallelism, more task overhead) and, on the cluster profile,
+  `SPARK_WORKER_CORES` / `SPARK_WORKER_MEMORY`.
 - **Web tier:** raise `GUNICORN_WORKERS` or add web replicas (stateless).
 
 ## Standalone Spark cluster

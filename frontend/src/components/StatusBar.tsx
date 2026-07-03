@@ -71,7 +71,11 @@ export default function StatusBar({
         {targets.length === 1 ? "column" : "columns"} selected
       </span>
 
-      {cellRef && <span className="sb-item mono">▣ {cellRef}</span>}
+      {cellRef && (
+        <span className="sb-item mono">
+          <span aria-hidden="true">▣</span> {cellRef}
+        </span>
+      )}
 
       <span className="sb-spacer" />
 

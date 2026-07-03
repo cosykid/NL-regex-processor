@@ -41,7 +41,7 @@
   box-shadow: 0 0 0 3px var(--accent-softer);
 }
 .c-prompt {
-  flex: 1;
+  flex: 2;
   min-width: 0;
 }
 .c-prompt input {
@@ -71,6 +71,14 @@
   gap: 9px;
   padding: 0 16px;
 }
+/* When a value box is shown, let this side grow so the box gets real room
+   instead of a cramped fixed width — prompt (flex:2) leads 2:1, so the value
+   side takes about a third of the bar. With no value box (extract/keep/drop) it
+   stays `0 0 auto` so no empty gap opens. */
+.c-replace.has-value {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .c-replace .arrow {
   color: var(--faint);
   font-size: 15px;
@@ -87,11 +95,126 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--accent-deep);
-  width: 140px;
+  /* Grows to fill the widened `.c-replace.has-value` side; the min keeps the
+     widest placeholder ("new text — blank removes match") readable when space
+     is tight. */
+  flex: 1 1 auto;
+  min-width: 30ch;
   padding: 13px 0;
 }
 .c-replace input::placeholder {
   color: var(--faint);
+}
+/* Output-action picker — a custom listbox (see ActionMenu.tsx). A native <select>
+   can't style its menu or carry per-option descriptions, so we build our own. */
+.action-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+.action-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--accent-deep);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 6px 9px 6px 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.action-trigger:hover {
+  border-color: var(--accent);
+}
+.action-trigger.open,
+.action-trigger:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-softer);
+}
+.action-trigger .at-caret {
+  width: 10px;
+  height: 10px;
+  color: var(--faint);
+  transition: transform 0.15s;
+}
+.action-trigger.open .at-caret {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+/* the popover menu */
+.action-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 264px;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+  animation: action-pop-in 0.13s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+}
+@keyframes action-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+.action-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 9px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.action-opt + .action-opt {
+  margin-top: 1px;
+}
+.action-opt .ao-check {
+  flex: 0 0 14px;
+  width: 14px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--accent);
+  text-align: center;
+}
+.action-opt .ao-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.action-opt .ao-label {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.action-opt .ao-desc {
+  margin-top: 1px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+/* keyboard / hover highlight */
+.action-opt.active {
+  background: var(--accent-softer);
+}
+/* the current selection */
+.action-opt.selected .ao-label {
+  color: var(--accent-deep);
 }
 .run-btn {
   flex: 0 0 auto;
@@ -223,6 +346,27 @@
   color: var(--accent);
   flex: 0 0 auto;
 }
+/* The action that ran, e.g. "auto → Mask". Reads as a status pill on the strip. */
+.pattern-strip .action-badge {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  padding: 2px 8px;
+}
+.pattern-strip .action-badge .ab-auto {
+  color: var(--faint);
+  font-weight: 600;
+  text-transform: none;
+}
 .pattern-strip code {
   font-family: var(--mono);
   font-size: 12.5px;
@@ -244,6 +388,39 @@
   text-overflow: ellipsis;
   font-size: 12.5px;
   flex: 0 1 auto;
+}
+
+/* multi-column condition breakdown (column ~ /pattern/ AND …) */
+.pattern-strip .predicates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  flex: 0 1 auto;
+}
+.pattern-strip .pred {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.pattern-strip .pred .pcol {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent-deep);
+  white-space: nowrap;
+}
+.pattern-strip .pred code {
+  max-width: 220px;
+}
+.pattern-strip .conj {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  flex: 0 0 auto;
 }
 
 /* progress (running) */

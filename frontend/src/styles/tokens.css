@@ -52,13 +52,13 @@
   --scroll-thumb-hover: #aab2bf;
   --col-type-bg: #dde1e8;
 
-  /* the data signal — a sky blue, kept a distinct hue from the cobalt accent
+  /* the data signal — an azure blue, kept a distinct hue from the cobalt accent
      so the two read apart (and blend visibly where they cross) */
-  --signal: #0284c7;
-  --signal-deep: #075985;
-  --signal-soft: #e0f2fe;
-  --signal-line: #7dd3fc;
-  --signal-rgb: 2, 132, 199;
+  --signal: #1f6feb;
+  --signal-deep: #0b4a9c;
+  --signal-soft: #dbeafe;
+  --signal-line: #93b4f5;
+  --signal-rgb: 31, 111, 235;
 
   /* "this changed" highlight inside a cell */
   --hit-bg: var(--signal-soft);
@@ -138,12 +138,12 @@
   --scroll-thumb-hover: #48484c;
   --col-type-bg: #2a2a2d;
 
-  /* data signal — a bright sky blue, distinct from the cobalt accent */
-  --signal: #38bdf8;
-  --signal-deep: #bae6fd;
-  --signal-soft: #0c2a3a;
-  --signal-line: #1e4a63;
-  --signal-rgb: 56, 189, 248;
+  /* data signal — a bright azure blue, distinct from the cobalt accent */
+  --signal: #5b8ff5;
+  --signal-deep: #c7d8ff;
+  --signal-soft: #12233f;
+  --signal-line: #2a4269;
+  --signal-rgb: 91, 143, 245;
 
   --hit-bg: var(--signal-soft);
   --hit-fg: var(--signal-deep);

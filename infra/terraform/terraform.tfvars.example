@@ -27,6 +27,12 @@ abort_incomplete_multipart_days    = 7
 # uploads_expiration_days = 30
 # results_expiration_days = 7
 
+# --- direct browser<->S3 uploads ---
+# REQUIRED for the direct-to-S3 upload flow: the browser PUTs the file straight
+# to the bucket, so the bucket must allow CORS from the app's origin(s). List
+# every origin the frontend is served from (dev + prod). Empty = no CORS rule.
+# cors_allowed_origins = ["http://localhost:8080", "https://app.example.com"]
+
 # --- deployed trust (only relevant when create_dev_user = false) ---
 # trusted_role_services = ["ecs-tasks.amazonaws.com", "ec2.amazonaws.com"]
 #

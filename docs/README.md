@@ -31,4 +31,6 @@ Upload CSV/Excel ─► describe a pattern in English ─► LLM→regex (cached
   Celery worker.
 - **Scales to millions of rows** — native Spark column expressions across
   partitions; results written as Parquet and paged with DuckDB.
+- **Six output actions** — replace, mask, extract (cell edits), keep/drop rows,
+  find (report-only); `auto` lets the model infer the action from the prompt.
 - **Runs with no API key** — a deterministic heuristic generator backs the LLM.

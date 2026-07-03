@@ -141,4 +141,130 @@
   font-size: 12.5px;
   color: var(--muted);
 }
+/* Real upload-progress bar: width tracks bytes actually transferred. */
+.import-progress {
+  width: 100%;
+  max-width: 260px;
+  height: 8px;
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.import-progress > i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+
+/* --- Recent files: reopen a previously-imported file (client-side only) --- */
+.recents {
+  margin-top: 26px;
+  text-align: left;
+}
+.recents-head {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin: 0 2px 10px;
+}
+.recents-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.recent {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.recent:hover {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-softer);
+}
+.recent-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  border-radius: var(--r-lg);
+}
+.recent-open:disabled {
+  cursor: default;
+}
+.recent-icon {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--accent-softer);
+  border: 1px solid var(--accent-line);
+  color: var(--accent);
+  font-size: 14px;
+}
+.recent-body {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.recent-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-meta b {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.recent-forget {
+  flex: none;
+  width: 34px;
+  border: 0;
+  background: transparent;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: var(--r-lg);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.recent-forget:hover:not(:disabled) {
+  color: var(--rose);
+  background: var(--rose-soft);
+}
+.recent-forget:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
 

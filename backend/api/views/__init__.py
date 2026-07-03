@@ -22,10 +22,24 @@ from .jobs import (
     JobListCreateView,
     JobResultsView,
 )
-from .uploads import UploadDetailView, UploadRowsView, UploadView
+from .uploads import (
+    UploadCompleteView,
+    UploadDetailView,
+    UploadMultipartAbortView,
+    UploadMultipartCompleteView,
+    UploadMultipartCreateView,
+    UploadPresignView,
+    UploadRowsView,
+    UploadView,
+)
 
 __all__ = [
     "UploadView",
+    "UploadPresignView",
+    "UploadCompleteView",
+    "UploadMultipartCreateView",
+    "UploadMultipartCompleteView",
+    "UploadMultipartAbortView",
     "UploadDetailView",
     "UploadRowsView",
     "JobListCreateView",

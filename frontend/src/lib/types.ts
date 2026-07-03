@@ -30,6 +30,6 @@ export function inferType(
     return { glyph: "◷", title: "Date / time" };
   if (lname === "id" || lname.endsWith("_id") || lname.includes("phone"))
     return { glyph: "#", title: "Identifier / number" };
-  if (all(NUMISH)) return { glyph: "#", title: "Number" };
+  if (all(NUMISH)) return { glyph: "#", title: "Number", align: "right" };
   return { glyph: "T", title: "Text" };
 }

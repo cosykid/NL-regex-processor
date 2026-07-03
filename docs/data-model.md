@@ -36,8 +36,9 @@ One natural-language replacement request against an uploaded file.
 | `id` | UUID (pk) | |
 | `uploaded_file` | FK → UploadedFile | `on_delete=CASCADE` |
 | `nl_prompt` | text | The natural-language pattern description |
-| `replacement_value` | text | Blank = delete matches |
-| `target_columns` | JSON | Columns to apply the replacement to |
+| `replacement_value` | text | Read by `replace` (blank = delete matches) and `mask` (blank = default `••••` token); ignored by other actions |
+| `target_columns` | JSON | Columns the user selected as candidates for matching/replacement |
+| `action` | enum | Requested output action: `auto` (default — the model infers it from the prompt) · `find` · `replace` · `mask` · `extract` · `keep` · `drop` |
 
 **Lifecycle**
 
@@ -49,13 +50,16 @@ One natural-language replacement request against an uploaded file.
 | `celery_task_id` | char(255) | For revoke/inspection |
 | `error_message` | text | Populated on `FAILED` |
 
-**Resolved regex**
+**Resolved match conditions**
 
 | Field | Type | Notes |
 |-------|------|-------|
-| `regex_pattern` | text | The applied pattern |
+| `predicates` | JSON | Per-column match conditions: a list of `{column, pattern, explanation}`. Source of truth for matching/replacement; a single-column request is a one-element list |
+| `combinator` | enum | How predicates combine: `all` (AND) · `any` (OR) |
+| `regex_pattern` | text | Human-readable summary of the predicate set (the bare pattern for one predicate, else `col ~ /pat/` joined by AND/OR) |
 | `regex_source` | enum | `cache` · `llm` · `heuristic` |
-| `regex_explanation` | text | One-line explanation |
+| `regex_explanation` | text | One-line explanation of the overall row selection |
+| `resolved_action` | enum | The concrete action that actually ran (what `auto` resolved to; matches `action` when explicit). Empty until the conditions are resolved — lets the UI show "Auto → Mask" |
 
 **Result**
 
@@ -63,7 +67,7 @@ One natural-language replacement request against an uploaded file.
 |-------|------|-------|
 | `result_path` | char(1024) | Storage locator for the Parquet result dir — S3 key (`results/<id>/`) or local path |
 | `total_rows` | bigint \| null | Row count |
-| `matched_rows` | bigint \| null | Rows with at least one match in a target column |
+| `matched_rows` | bigint \| null | Rows satisfying the combined predicate condition |
 | `result_columns` | JSON | Column order of the result |
 | `created_at` / `updated_at` | datetime | |
 

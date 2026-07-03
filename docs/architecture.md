@@ -14,10 +14,10 @@
 
 | Component | Tech | Role |
 |-----------|------|------|
-| Frontend | React (Vite), served by nginx | Spreadsheet-style workspace: import a dataset, compose transformations in a formula bar, run them repeatedly, live grid + paginated results. nginx also reverse-proxies `/api`. |
+| Frontend | React + TypeScript (Vite), served by nginx | Spreadsheet-style workspace: import a dataset, compose transformations in a formula bar, run them repeatedly, live grid + paginated results. nginx also reverse-proxies `/api`. |
 | Web API | Django + DRF (gunicorn) | Accept uploads, create/poll jobs, serve paged results. Never does heavy work. |
 | Broker / backend / cache | Redis | Celery broker (`/0`), result backend (`/1`), regex cache + cancel flags (`/2`). |
-| Worker | Celery + PySpark | Runs the pipeline: regex generation → Spark replacement → Parquet write. |
+| Worker | Celery + PySpark | Runs the pipeline: predicate generation → action resolution → Spark select + apply (replace/mask/extract/keep/drop/find) → Parquet write. |
 | Database | **Neon** (serverless Postgres) via `DATABASE_URL` | The single platform database — persists `UploadedFile` and `Job` rows (status, progress, results). No container/SQLite fallback. |
 | Engine | Apache Spark (`local[*]` or standalone) | The distributed pattern-match/replace engine. |
 | Object storage | S3 bucket (`STORAGE_BACKEND=s3`) or local `DATA_DIR` | `uploads/` (inputs) and `results/<job>/` (Parquet outputs), shared by web, worker, and Spark executors. |
@@ -26,13 +26,14 @@
 
 ```
 backend/
-├── config/            project: settings, celery app, urls
-├── api/               ── API LAYER ──  serializers · views · urls · pagination
+├── config/            project: settings/ (env-split package), celery app, urls
+├── api/               ── API LAYER ──  serializers · views/ (uploads · jobs) · exports · params · urls · pagination
 ├── jobs/              ── DATA LAYER ── UploadedFile + Job models
 └── processing/        ── TASK + ENGINE LAYER ──
     ├── tasks.py           Celery orchestration of the pipeline
+    ├── ingest.py          upload service: stage → inspect → persist → create UploadedFile
     ├── spark_engine.py    PySpark read → transform → write (+ progress, cancel)
-    ├── llm.py             NL→regex: cache → LLM → heuristic fallback
+    ├── llm.py             NL→per-column predicates: cache → LLM → heuristic fallback
     ├── regex_safety.py    validation + ReDoS guard
     ├── cache.py           Redis regex cache + cancel flags
     ├── file_inspect.py    header/preview + cursor-paged raw reads (no full-file load)
@@ -43,7 +44,10 @@ backend/
 The dependency direction is one-way: `api → processing → jobs`. The API layer
 knows about the task layer (to dispatch) and the data layer (to serialize); the
 engine/task layer knows about the data layer; the data layer knows nothing about
-the others.
+the others. Request handlers stay thin: the upload flow lives in
+`processing/ingest.py` and the export/streaming logic in `api/exports.py`, so the
+views (split into `views/uploads.py` and `views/jobs.py`) mostly validate input
+and delegate.
 
 ## High-level diagram
 
@@ -66,8 +70,8 @@ the others.
                              │ deliver task
                   ┌──────────▼─────────────────────────────┐
                   │  Celery worker                          │
-                  │   1. NL → regex (cache → LLM → verify)  │
-                  │   2. PySpark replacement (partitioned)  │
+                  │   1. NL → predicates (cache→LLM→verify) │
+                  │   2. PySpark select + replace (part.)   │
                   │   3. write Parquet result               │
                   │   + progress updates + cancellation     │
                   └──────────┬──────────────────────────────┘
@@ -90,12 +94,12 @@ Browser        Web (Django)        Redis        Worker (Celery+Spark)       Neon
    │ ◄── job id (QUEUED) — returns immediately                               │
    │                  │                 │ deliver ──►│                       │
    │                  │                 │            │ RUNNING ─────────────►│
-   │                  │                 │            │ regex: cache?─►LLM─►validate
+   │                  │                 │            │ predicates: cache?─►LLM─►validate
    │                  │                 │◄───────────┤ cache lookup/store    │
-   │                  │                 │            │ Spark: read→replace→Parquet
+   │                  │                 │            │ Spark: read→select+replace→Parquet
    │                  │                 │            │ progress (poller) ───►│ progress%
    │ GET /jobs/<id> ─►│ read Job ──────────────────────────────────────────►│
-   │ ◄── status,progress,regex (poll ~1.5s)                                  │
+   │ ◄── status,progress,predicates (poll ~1.5s)                             │
    │                  │                 │            │ SUCCESS + stats ─────►│
    │ GET /jobs/<id>/results?page= ─►│ DuckDB pages Parquet from storage ─────│
    │ ◄── {columns, rows, total, num_pages}                                   │
@@ -131,7 +135,10 @@ next poll rather than hard-killing the worker, so state stays consistent.
   UI steering to CSV.
 - **Spark `local[*]` by default, cluster optional.** Local mode is a real,
   partitioned Spark runtime that runs reliably on first `up`; the standalone
-  cluster is one env-var + `--profile cluster` away.
+  cluster is one env-var + `--profile cluster` away. Each Celery worker child
+  warms the Spark JVM at boot (`worker_process_init`), so the ~10–15 s cold
+  start is paid at startup, not on the first job's progress bar (`SPARK_WARMUP`,
+  default on).
 - **Neon (serverless Postgres) for job state.** A single managed database
   resolved from `DATABASE_URL` — no local Postgres container and no SQLite
   fallback. It models the production story cleanly, and persistent connections

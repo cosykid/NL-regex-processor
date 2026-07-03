@@ -1,6 +1,15 @@
 /* ========================================================================== *
  *  Shared: buttons, alerts, spinner, links
  * ========================================================================== */
+
+/* One visible keyboard-focus ring everywhere. :where() keeps specificity at
+   zero so controls with their own focus treatment (composer fields, the action
+   trigger) still override it. Inputs are excluded — theirs is the border/glow. */
+:where(button, a, [role="button"], [role="menuitem"], summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .btn {
   font-size: 13px;
   font-weight: 600;

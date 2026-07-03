@@ -18,7 +18,7 @@ without loading the file into the web process.
 ```
 
 > **Stack:** Django + DRF · Celery · Redis (broker / result backend / cache) ·
-> PySpark · React (Vite) · **Neon** (serverless Postgres) · **S3** (object
+> PySpark · React + TypeScript (Vite) · **Neon** (serverless Postgres) · **S3** (object
 > storage, or a local volume) · Docker Compose.
 
 ---
@@ -128,12 +128,19 @@ The system is split into clear layers with a deliberate separation between the
    Celery task, and **returns a job id immediately**. The endpoint never blocks
    on the LLM or Spark.
 3. **Background pipeline** (Celery worker):
-   - **Regex generation** is itself background work: check the Redis cache,
-     else call the LLM (or the heuristic fallback), then **validate** the
+   - **Condition generation** is itself background work: check the Redis cache,
+     else call the LLM (or the heuristic fallback) to decompose the prompt into
+     per-column predicates + an AND/OR combinator, then **validate** every
      pattern (compilability + ReDoS safety) before use.
-   - **Spark replacement**: read the file into a DataFrame, apply
-     `regexp_replace` across the target column(s) as a native, partitioned
-     transformation, and write the result as Parquet.
+   - **Action resolution** — each job carries an output `action`: `replace`,
+     `mask`, `extract` (cell edits), `keep`/`drop` (row filters), `find`
+     (report-only), or `auto` (default), where the model infers the action —
+     and any inline value — from the verb in the prompt.
+   - **Spark select + apply**: read the file into a DataFrame, combine the
+     per-column `rlike` predicates into the row-match condition, and apply the
+     resolved action to matched rows as a native, partitioned transformation
+     (`regexp_replace` / `regexp_extract` / a row filter), writing the result
+     as Parquet.
    - **Progress** is mirrored to both the `Job` row and the Celery task state,
      surfaced through the polling API as a percentage + stage label.
 4. **Poll** — the UI polls `GET /api/jobs/<id>` (~1.5 s) for status/progress and
@@ -214,13 +221,23 @@ select it, enter *"Find email addresses"*, replacement `REDACTED`, and run.
   "uploaded_file": "<upload-uuid>",
   "nl_prompt": "Find email addresses",
   "replacement_value": "REDACTED",
-  "target_columns": ["Email"]
+  "target_columns": ["Email"],
+  "action": "auto"
 }
 ```
 
+To match across columns, select multiple `target_columns` and describe the
+per-column conditions in one prompt — e.g. `"name starts with A and phone starts
+with 0"` resolves to two predicates combined with AND (use "or" for OR).
+`action` is optional: `auto` (default) infers the output action from the prompt's
+verb; an explicit `find`, `replace`, `mask`, `extract`, `keep`, or `drop`
+overrides it.
+
 **Job object (polled)** includes `status` (`QUEUED|RUNNING|SUCCESS|FAILED|CANCELLED`),
-`progress` (0–100), `stage`, `regex_pattern`, `regex_source`
-(`cache|llm|heuristic`), `total_rows`, `matched_rows`, `error_message`.
+`progress` (0–100), `stage`, `predicates` (`[{column, pattern, explanation}]`),
+`combinator` (`all|any`), `regex_pattern` (a readable summary), `regex_source`
+(`cache|llm|heuristic`), `resolved_action` (the concrete action that ran),
+`total_rows`, `matched_rows`, `error_message`.
 
 ---
 
@@ -232,23 +249,17 @@ the key scaling decision: the work executes inside the JVM across partitions
 with no per-row Python serialization round-trip, so throughput stays high as the
 row count grows into the millions.
 
-**Partitioning choice.** The number of partitions is derived from the row count
-and a configurable target rows-per-partition
-(`SPARK_ROWS_PER_PARTITION`, default 200k):
+**Partitioning choice.** Partitioning is left to Spark's native file splitting
+(`spark.sql.files.maxPartitionBytes`, default 128 MB): a large uncompressed CSV
+is split by size into one task per split, so work spreads across all cores
+(local) or executors (cluster) with no extra step. We do **not** `repartition` —
+a forced full shuffle dominated cost on small files and was redundant on large
+ones already split.
 
-```
-partitions = ceil(total_rows / SPARK_ROWS_PER_PARTITION)   # capped at 1024
-```
-
-Why this approach:
-
-- **Bounded task working set.** Each task processes ~200k rows, keeping memory
-  predictable and avoiding both tiny-task overhead and oversized partitions.
-- **Horizontal parallelism.** Partition count ≈ task count, so the work spreads
-  across all available cores (local mode) or executors (cluster mode). A 5M-row
-  file becomes ~25 tasks that run in parallel.
-- **Granular progress.** More partitions → more tasks → smoother progress
-  reporting (the poller maps completed-tasks/total-tasks onto a progress band).
+**Single cached parse.** The source is read/parsed **once** and cached
+(`MEMORY_AND_DISK`). The row-count pass materialises the cache and the write
+reads from it, so the CSV is never re-parsed per action — previously three full
+passes (count, matched-count, write), now one parse plus the write.
 
 **Reading & writing.** Input is read with Spark's CSV reader (Excel is
 stream-converted to CSV first, since Excel is inherently bounded). The result is
@@ -274,11 +285,13 @@ output straight to the bucket (`s3a://`), so no shared volume is needed.
    context (target columns + sampled values), so identical requests over the
    same data are never re-sent to the LLM (`regex_source: "cache"`).
 2. **LLM** (Anthropic, when `ANTHROPIC_API_KEY` is set) — constrained via
-   **structured outputs** to emit a single Java/Spark-compatible regex. The
-   prompt includes a few real values from each target column so the pattern
-   matches the data's actual case/format (e.g. `False`, not `false`). The
-   default model is **`claude-haiku-4-5`** (NL→regex is a small, latency- and
-   cost-sensitive task); override with `LLM_MODEL`.
+   **structured outputs** to decompose the description into per-column
+   Java/Spark-compatible predicates (and, under `action: auto`, to pick the
+   output action + any inline value from the prompt's verb). The prompt includes
+   a few real values from each target column so the pattern matches the data's
+   actual case/format (e.g. `False`, not `false`). The default model is
+   **`claude-haiku-4-5`** (NL→regex is a small, latency- and cost-sensitive
+   task); override with `LLM_MODEL`.
 3. **Heuristic fallback** — a deterministic library so the platform runs with no
    key (`regex_source: "heuristic"`).
 
@@ -289,7 +302,9 @@ generated pattern before it touches Spark:
 - **compilability** under Python `re`,
 - a **catastrophic-backtracking guard**: reject nested unbounded quantifiers
   (`(a+)+`-style), and run the pattern against adversarial inputs inside a hard
-  wall-clock timeout **in a separate process we can actually kill**.
+  wall-clock timeout (a daemon-thread probe — Celery's prefork children are
+  daemonic and can't spawn processes; the static check is the primary gate and
+  the probe a backstop).
 
 Spark's `regexp_replace` uses Java regex, which can also backtrack
 catastrophically — so we gate the pattern *before* it reaches the cluster. The
@@ -328,8 +343,8 @@ The web process stays responsive throughout (it only ever enqueues and polls);
 all parsing and replacement happen in the Spark job inside the worker, and the
 result is paged back from Parquet.
 
-> Tune `SPARK_ROWS_PER_PARTITION`, `CELERY_CONCURRENCY`, and (for the cluster
-> profile) `SPARK_WORKER_CORES`/`SPARK_WORKER_MEMORY` to match your hardware.
+> Tune `CELERY_CONCURRENCY` and (for the cluster profile)
+> `SPARK_WORKER_CORES`/`SPARK_WORKER_MEMORY` to match your hardware.
 
 ---
 
@@ -458,6 +473,14 @@ backend refuses to start without it. See
   both "return immediately with a job id" and "regex generation as a background
   task" — doing it in Celery satisfies both and keeps LLM latency off the
   request path. The cache still makes repeat prompts effectively instant.
+- **Upload ingest is streamed, not queued.** The upload endpoint streams the
+  file straight to object storage and reads only its header (column names + a
+  small preview) before responding — the full file is never loaded into the web
+  process. We deliberately keep this inline rather than dispatching a Celery
+  task for it: it's bounded, near-instant work, so a task would add round-trips
+  and a status-poll cycle for no gain. The *heavy, unbounded* work — regex
+  generation and the Spark replacement over millions of rows — is what runs
+  asynchronously.
 - **Parquet + DuckDB for paged reads.** Writing Parquet lets the read path page
   efficiently without booting Spark per request; DuckDB reads only the needed
   row groups. Results are stored as Parquet; `GET /api/jobs/<id>/export` streams

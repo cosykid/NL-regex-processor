@@ -35,7 +35,6 @@ x-backend-env: &backend-env
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
   LLM_MODEL: ${LLM_MODEL:-claude-haiku-4-5}
   SPARK_MASTER_URL: ${SPARK_MASTER_URL:-local[*]}
-  SPARK_ROWS_PER_PARTITION: ${SPARK_ROWS_PER_PARTITION:-200000}
 
 services:
   redis:

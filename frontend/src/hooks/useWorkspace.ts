@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { cancelJob, createJob, listJobs } from "../api/client";
-import { TERMINAL } from "../lib/constants";
+import { cancelJob, createJob, getUpload, listJobs } from "../api/client";
+import { TERMINAL, VALUE_ACTIONS } from "../lib/constants";
 import { errorMessage } from "../lib/errors";
-import type { Dataset, GridMeta, Job } from "../lib/api-types";
+import { pushRecent, removeRecent } from "../lib/recents";
+import type { Dataset, GridMeta, Job, JobAction } from "../lib/api-types";
 import { LS_KEY } from "./useSessionRestore";
 
 /**
@@ -20,6 +21,7 @@ export function useWorkspace() {
   // Composer state (lifted so runs can populate it and it survives view changes).
   const [prompt, setPrompt] = useState("");
   const [replacement, setReplacement] = useState("");
+  const [action, setAction] = useState<JobAction>("auto");
   const [targets, setTargets] = useState<string[]>([]);
   const [focusSignal, setFocusSignal] = useState(0);
   const [error, setError] = useState("");
@@ -43,11 +45,13 @@ export function useWorkspace() {
   /* ---- handlers ---- */
   const handleDataset = useCallback(async (upload: Dataset) => {
     localStorage.setItem(LS_KEY, upload.id);
+    pushRecent(upload); // remember it so it's reachable after the next file
     setDataset(upload);
     setActiveRunId(null);
     setTargets([]);
     setPrompt("");
     setReplacement("");
+    setAction("auto");
     setError("");
     // A freshly uploaded file usually has no runs, but be robust to re-imports.
     try {
@@ -56,6 +60,21 @@ export function useWorkspace() {
       setRuns([]);
     }
   }, []);
+
+  // Reopen a previously-seen file by id (from the recents list). The server
+  // keeps every upload, so this just re-fetches it; a gone file is dropped from
+  // recents and surfaced to the caller.
+  const reopen = useCallback(
+    async (id: string) => {
+      try {
+        await handleDataset(await getUpload(id));
+      } catch (e) {
+        removeRecent(id);
+        throw e;
+      }
+    },
+    [handleDataset]
+  );
 
   const toggleTarget = useCallback((col: string) => {
     setTargets((prev) =>
@@ -69,8 +88,12 @@ export function useWorkspace() {
     const payload = {
       uploaded_file: dataset.id,
       nl_prompt: prompt.trim(),
-      replacement_value: replacement,
+      // Only replace/mask consume the typed value; for other actions the box
+      // is hidden, so drop any stale text rather than letting it leak into the
+      // run (under `auto` the backend would prefer it over the AI's value).
+      replacement_value: VALUE_ACTIONS.has(action) ? replacement : "",
       target_columns: targets,
+      action,
     };
     try {
       const job = await createJob(payload);
@@ -85,6 +108,7 @@ export function useWorkspace() {
     setActiveRunId(run.id);
     setPrompt(run.nl_prompt || "");
     setReplacement(run.replacement_value ?? "");
+    setAction(run.action || "auto");
     if (Array.isArray(run.target_columns) && run.target_columns.length) {
       setTargets(run.target_columns);
     }
@@ -110,6 +134,7 @@ export function useWorkspace() {
     setActiveRunId(null);
     setTargets([]);
     setPrompt("");
+    setAction("auto");
     setGridMeta(null);
   }
 
@@ -138,6 +163,8 @@ export function useWorkspace() {
     setPrompt,
     replacement,
     setReplacement,
+    action,
+    setAction,
     targets,
     focusSignal,
     error,
@@ -146,6 +173,7 @@ export function useWorkspace() {
     selectedCell,
     cellRef,
     handleDataset,
+    reopen,
     toggleTarget,
     runTransformation,
     selectRun,

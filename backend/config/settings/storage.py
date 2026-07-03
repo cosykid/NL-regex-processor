@@ -25,6 +25,10 @@ RESULTS_DIR = DATA_DIR / "results"
 if STORAGE_BACKEND == "local":
     for _d in (DATA_DIR, UPLOAD_DIR, RESULTS_DIR):
         _d.mkdir(parents=True, exist_ok=True)
+    # Spill Django's large-upload temp file onto the same volume as the final
+    # upload dir, so ingest can *rename* it into place instead of copying every
+    # byte across filesystems (the OS default temp dir is usually a different fs).
+    FILE_UPLOAD_TEMP_DIR = str(UPLOAD_DIR)
 S3_BUCKET = os.environ.get("S3_BUCKET", "")
 S3_REGION = (
     os.environ.get("S3_REGION")

@@ -15,6 +15,8 @@ LLM or Spark; that work runs in the Celery worker.
 """
 from __future__ import annotations
 
+from typing import cast
+
 from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -28,7 +30,7 @@ from processing import cache, results
 from processing.tasks import process_job
 
 from .. import exports
-from ..params import _truthy
+from ..params import truthy
 from ..serializers import JobCreateSerializer, JobSerializer
 
 
@@ -47,7 +49,7 @@ class JobListCreateView(ListAPIView):
     def post(self, request):
         serializer = JobCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        job = serializer.save()
+        job = cast(Job, serializer.save())
 
         # Dispatch the heavy work and return immediately with a job id.
         async_result = process_job.delay(str(job.id))
@@ -103,9 +105,12 @@ class JobResultsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        matched_only = _truthy(request.query_params.get("matched_only"))
+        matched_only = truthy(request.query_params.get("matched_only"))
+        # Reuse the counts persisted at job completion so paging/switching doesn't
+        # re-scan the result to recompute them on every request.
         data = results.read_page(
-            job.result_path, page, page_size, matched_only=matched_only
+            job.result_path, page, page_size, matched_only=matched_only,
+            total_all=job.total_rows, matched_total=job.matched_rows,
         )
         return Response(data)
 
@@ -132,7 +137,7 @@ class JobExportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        matched_only = _truthy(request.query_params.get("matched_only"))
+        matched_only = truthy(request.query_params.get("matched_only"))
         try:
             tmp_path = spec.build(job.result_path, matched_only=matched_only)
         except results.ResultTooLargeForExcel as exc:

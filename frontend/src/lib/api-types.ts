@@ -11,6 +11,33 @@ export type JobStatus =
 
 export type RegexSource = "cache" | "llm" | "heuristic" | "";
 
+/** How a row's per-column predicates combine: `all` = AND, `any` = OR. */
+export type Combinator = "all" | "any";
+
+/** What to do with the matches. `auto` lets the model infer the action from the
+ *  prompt; the rest are explicit overrides. `find` only reports matches (no
+ *  data change); `replace`/`mask`/`extract` rewrite matched cells; `keep`/
+ *  `drop` filter rows. */
+export type JobAction =
+  | "auto"
+  | "find"
+  | "replace"
+  | "mask"
+  | "extract"
+  | "keep"
+  | "drop";
+
+/** The concrete action a finished/resolved job actually ran (never `auto`; `""`
+ *  until the job has resolved its conditions). */
+export type ResolvedAction = Exclude<JobAction, "auto"> | "";
+
+/** One per-column match condition resolved from the natural-language prompt. */
+export interface Predicate {
+  column: string;
+  pattern: string;
+  explanation: string;
+}
+
 /** One data row. Cell values arrive as strings (CSV) or native scalars (Parquet
  *  results via DuckDB); the two `__…__` keys are appended by the result reader. */
 export interface Row {
@@ -47,9 +74,18 @@ export interface Job {
   nl_prompt: string;
   replacement_value: string;
   target_columns: string[];
+  /** The action requested (may be `auto`). */
+  action: JobAction;
+  /** The concrete action the job resolved to (what actually ran). */
+  resolved_action: ResolvedAction;
   status: JobStatus;
   progress: number;
   stage: string;
+  /** Per-column match conditions resolved from `nl_prompt` (empty until ready). */
+  predicates: Predicate[];
+  /** How `predicates` combine: `all` = AND, `any` = OR. */
+  combinator: Combinator;
+  /** Human-readable summary of the predicate set (single pattern, or joined). */
   regex_pattern: string;
   regex_source: RegexSource;
   regex_explanation: string;
@@ -67,6 +103,7 @@ export interface JobCreatePayload {
   nl_prompt: string;
   replacement_value: string;
   target_columns: string[];
+  action: JobAction;
 }
 
 /** GET /uploads/<id>/rows — one cursor-based window of the raw upload. */
@@ -95,6 +132,8 @@ export interface ResultsResponse {
 export interface ColumnType {
   glyph: string;
   title: string;
+  /** Cell alignment hint — numeric columns read right-aligned in the grid. */
+  align?: "right";
 }
 
 /** Snapshot the grid reports up to the status bar. Some fields only apply to a

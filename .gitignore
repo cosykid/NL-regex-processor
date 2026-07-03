@@ -13,6 +13,7 @@ backend/staticfiles/
 # Data / runtime artifacts — local-mode output only (s3 mode uses a bucket).
 # No /data dir is committed; ignore anything a local run might drop there.
 /data/*
+*.log
 
 # Node / frontend
 node_modules/

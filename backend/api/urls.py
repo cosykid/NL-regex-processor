@@ -4,6 +4,23 @@ from . import views
 
 urlpatterns = [
     path("uploads", views.UploadView.as_view(), name="upload-create"),
+    path("uploads/presign", views.UploadPresignView.as_view(), name="upload-presign"),
+    path("uploads/complete", views.UploadCompleteView.as_view(), name="upload-complete"),
+    path(
+        "uploads/multipart/create",
+        views.UploadMultipartCreateView.as_view(),
+        name="upload-multipart-create",
+    ),
+    path(
+        "uploads/multipart/complete",
+        views.UploadMultipartCompleteView.as_view(),
+        name="upload-multipart-complete",
+    ),
+    path(
+        "uploads/multipart/abort",
+        views.UploadMultipartAbortView.as_view(),
+        name="upload-multipart-abort",
+    ),
     path("uploads/<uuid:pk>", views.UploadDetailView.as_view(), name="upload-detail"),
     path("uploads/<uuid:pk>/rows", views.UploadRowsView.as_view(), name="upload-rows"),
     path("jobs", views.JobListCreateView.as_view(), name="job-list-create"),

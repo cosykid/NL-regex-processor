@@ -145,7 +145,7 @@ def _probe_within_timeout(compiled: "re.Pattern", pattern: str) -> RegexValidati
     return RegexValidation(ok=True, pattern=pattern)
 
 
-def validate_regex(pattern: str) -> RegexValidation:
+def validate_regex(pattern: str | None) -> RegexValidation:
     """Validate a regex for correctness and backtracking safety."""
     if pattern is None or not pattern.strip():
         return RegexValidation(False, pattern or "", "Empty regex pattern.")

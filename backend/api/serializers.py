@@ -36,9 +36,13 @@ class JobSerializer(serializers.ModelSerializer):
             "nl_prompt",
             "replacement_value",
             "target_columns",
+            "action",
+            "resolved_action",
             "status",
             "progress",
             "stage",
+            "predicates",
+            "combinator",
             "regex_pattern",
             "regex_source",
             "regex_explanation",
@@ -63,6 +67,11 @@ class JobCreateSerializer(serializers.Serializer):
     target_columns = serializers.ListField(
         child=serializers.CharField(max_length=512), allow_empty=False
     )
+    # What to do with the matches. `auto` (default) lets the model infer it from
+    # the prompt; any explicit choice overrides that.
+    action = serializers.ChoiceField(
+        choices=Job.Action.values, default=Job.Action.AUTO
+    )
 
     def validate(self, attrs):
         uploaded_file: UploadedFile = attrs["uploaded_file"]
@@ -86,6 +95,7 @@ class JobCreateSerializer(serializers.Serializer):
             nl_prompt=validated_data["nl_prompt"],
             replacement_value=validated_data.get("replacement_value", ""),
             target_columns=validated_data["target_columns"],
+            action=validated_data.get("action", Job.Action.AUTO),
             status=Job.Status.QUEUED,
             stage="queued",
         )

@@ -84,15 +84,15 @@ cd frontend && npm install && npm run dev   # http://localhost:5173 (proxies /ap
 
 ```
 backend/
-  config/        Django project (settings, celery, urls, wsgi/asgi)
-  api/           DRF serializers, views, urls, pagination
+  config/        Django project (settings/ package, celery, urls, wsgi/asgi)
+  api/           DRF serializers, views/ (uploads, jobs), exports, params, urls, pagination
   jobs/          models (UploadedFile, Job) + migrations
-  processing/    tasks, spark_engine, llm, regex_safety, cache, file_inspect, results, storage
+  processing/    tasks, ingest, spark_engine, llm, regex_safety, cache, file_inspect, results, storage
   tests/         pytest suite
   Dockerfile · entrypoint.sh · requirements.txt · pytest.ini
-frontend/
-  src/           App.jsx, api.js, components/, styles.css
-  Dockerfile · nginx.conf · vite.config.js · package.json
+frontend/          (TypeScript)
+  src/           App.tsx, main.tsx, api/, lib/, hooks/, components/ (+ grid/), styles/
+  Dockerfile · nginx.conf · vite.config.ts · tsconfig*.json · package.json
 scripts/         generate_dataset.py
 samples/         contacts.csv
 docs/            this documentation
@@ -119,8 +119,12 @@ Coverage:
 |------|-------|
 | `tests/test_regex_safety.py` | validation, invalid/empty patterns, nested-quantifier rejection, length cap, replacement escaping |
 | `tests/test_llm_heuristic.py` | heuristic resolution (email/phone/quoted/unknown), generated patterns pass validation |
+| `tests/test_llm_context.py` | data-sample rendering, cache-context signature (same prompt over different data / actions doesn't collide), predicate validation, action-specialised prompts |
+| `tests/test_action_resolution.py` | `_resolve_action`: explicit action wins, `auto` defers to the model, typed value beats inferred, bogus action falls back to `replace` |
+| `tests/test_spark_conditions.py` | `build_match_condition` AND/OR combining and `cell_action_expr` branches, via a symbolic stand-in for `pyspark.sql.functions` (no JVM) |
 | `tests/test_file_inspect.py` | CSV + Excel header/preview extraction; cursor-paged raw windows (byte-offset resume, quoted-newline continuity) |
 | `tests/test_storage.py` | local backend round-trip; S3 locator/URI/Hadoop-config mapping; `inspect`/`read_window` over a binary stream |
+| `tests/test_results_page.py` | paged reads: row numbering from the page offset, original numbering preserved under affected-only, match flag surfaced/stripped, persisted counts reused |
 | `tests/test_results_export.py` | Parquet → CSV/Excel export, cell sanitising, affected-only, Excel row/column ceilings |
 | `tests/test_api.py` | upload, raw-row windowing + bad-cursor 400, job create + validation, results-not-ready 409, cancel |
 | `tests/test_cleanup.py` | `post_delete` storage cleanup — upload file, job result dir, cascade delete, best-effort on storage error |
@@ -150,3 +154,7 @@ python scripts/generate_dataset.py --rows 1000000 --out /tmp/big.csv
   app and tests import without a JVM or the LLM SDK present.
 - State transitions use `Job.objects.filter(id=...).update(...)` to avoid
   clobbering concurrent writes from the progress poller.
+- The frontend is **TypeScript** (strict mode). `npm run build` runs
+  `tsc --noEmit` (app + `vite.config.ts`) before bundling with Vite; use
+  `npm run type-check` for a types-only pass. Shared API/domain types live in
+  `frontend/src/lib/api-types.ts`.

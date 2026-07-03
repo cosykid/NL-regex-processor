@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, RefObject } from "react";
 import { getResults } from "../api/client";
 import { errorMessage } from "../lib/errors";
-import type { GridMeta, Job, Row } from "../lib/api-types";
+import * as resultCache from "../lib/resultCache";
+import type { GridMeta, Job, ResultsResponse, Row } from "../lib/api-types";
 
-export const PAGE_SIZE = 200;
+export const PAGE_SIZE = 100;
 
 interface Params {
   activeRun: Job | null;
@@ -81,35 +82,54 @@ export function useResultPage({ activeRun, showingResult, scrollRef, onMeta }: P
       return;
     }
 
+    // Push one response's data into state and reproduce the post-load side
+    // effects (scroll reset, jump-to-row flash). Shared by the cache-hit and
+    // fetch-success paths so a hit lands identically to a fetch, minus the wait.
+    const applyData = (d: ResultsResponse) => {
+      setColumns(d.columns);
+      setRows(d.rows);
+      setTotal(d.total);
+      setTotalAll(d.total_all ?? d.total);
+      setMatchedTotal(d.matched_total ?? 0);
+      setHasFlag(!!d.has_match_flag);
+      onMeta?.({
+        preview: false,
+        total: d.total,
+        totalAll: d.total_all ?? d.total,
+        matchedTotal: d.matched_total ?? 0,
+        affectedOnly,
+        shown: d.rows.length,
+        page: d.page,
+        numPages: d.num_pages,
+      });
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+      // If this load was triggered by a jump, flash the target row.
+      if (pendingFlash.current != null) {
+        const idx = pendingFlash.current;
+        pendingFlash.current = null;
+        requestAnimationFrame(() => flashAndScroll(idx));
+      }
+    };
+
+    // A previously fetched page is immutable within the session — serve it from
+    // memory with no spinner and no network call.
+    const key = resultCache.keyFor(activeRun.id, page, affectedOnly);
+    const cached = resultCache.get(key);
+    if (cached) {
+      setError("");
+      setLoading(false);
+      applyData(cached);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     getResults(activeRun.id, page, PAGE_SIZE, affectedOnly)
       .then((d) => {
         if (token !== reqToken.current) return;
-        setColumns(d.columns);
-        setRows(d.rows);
-        setTotal(d.total);
-        setTotalAll(d.total_all ?? d.total);
-        setMatchedTotal(d.matched_total ?? 0);
-        setHasFlag(!!d.has_match_flag);
-        onMeta?.({
-          preview: false,
-          total: d.total,
-          totalAll: d.total_all ?? d.total,
-          matchedTotal: d.matched_total ?? 0,
-          affectedOnly,
-          shown: d.rows.length,
-          page: d.page,
-          numPages: d.num_pages,
-        });
-        if (scrollRef.current) scrollRef.current.scrollTop = 0;
-        // If this load was triggered by a jump, flash the target row.
-        if (pendingFlash.current != null) {
-          const idx = pendingFlash.current;
-          pendingFlash.current = null;
-          requestAnimationFrame(() => flashAndScroll(idx));
-        }
+        resultCache.set(key, d);
+        applyData(d);
       })
       .catch((e) => {
         if (token === reqToken.current) setError(errorMessage(e));

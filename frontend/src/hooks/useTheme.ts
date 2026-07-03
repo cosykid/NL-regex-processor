@@ -3,7 +3,7 @@ import type { Theme } from "../lib/api-types";
 
 const THEME_KEY = "ds.theme";
 
-export function initialTheme(): Theme {
+function initialTheme(): Theme {
   const saved = localStorage.getItem(THEME_KEY);
   if (saved === "light" || saved === "dark") return saved;
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches

@@ -23,6 +23,15 @@
   overflow: auto;
   background: var(--paper);
 }
+/* The pane is focusable for arrow-key cell navigation; the selected cell is
+   the focus indicator on click, so only keyboard entry draws a pane ring. */
+.grid-scroll:focus {
+  outline: none;
+}
+.grid-scroll:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 
 /* lazy-loading footer under the grid when scrolling the original file */
 .grid-sentinel,
@@ -227,6 +236,10 @@
 }
 .grid td .cell.empty {
   color: var(--faint);
+}
+/* numeric columns read right-aligned (tabular figures are already on) */
+.grid td.num .cell:not(.empty) {
+  text-align: right;
 }
 .grid tbody tr:hover td {
   background: var(--row-hover);
@@ -544,7 +557,7 @@
   gap: 2px;
   background: var(--surface);
   border: 1px solid var(--line-2);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-lg); /* match the action-menu popover */
   box-shadow: var(--shadow-pop);
   z-index: 20;
 }

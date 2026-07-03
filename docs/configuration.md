@@ -1,6 +1,7 @@
 # Configuration
 
-All configuration is environment-driven (`backend/config/settings.py`). With
+All configuration is environment-driven (`backend/config/settings/`, an
+env-split settings package). With
 docker-compose, values come from `.env` (copy from `.env.example`) and the
 `x-backend-env` anchor in `docker-compose.yml`.
 
@@ -104,9 +105,11 @@ suite runs against the **same** Postgres — Django creates and drops an isolate
 |----------|---------|-------------|
 | `SPARK_MASTER_URL` | `local[*]` | `local[*]` (bundled runtime) or `spark://spark-master:7077` (cluster profile). |
 | `SPARK_DRIVER_HOST` | _(unset)_ | Set to `worker` when using the cluster profile so executors can reach the driver. |
-| `SPARK_ROWS_PER_PARTITION` | `200000` | Target rows per partition (drives the partition count). |
 | `SPARK_SHUFFLE_PARTITIONS` | `8` | `spark.sql.shuffle.partitions`. |
+| `SPARK_CSV_MULTILINE` | `true` | `true` parses quoted fields that span newlines but makes the CSV **non-splittable** (single-core read). Set `false` when your CSVs have no in-field newlines to split large files by size across all cores — the main read-stage speedup. |
+| `SPARK_DRIVER_MEMORY` | _(unset → 1g)_ | Driver JVM heap. In `local[*]` the driver is the executor, so this holds the cached frame; raise it (e.g. `2g`) to cut spill-to-disk on large inputs. Applied via the `SPARK_DRIVER_MEMORY` env at JVM launch (a `.config()` set would be a no-op). Keep within the worker container's memory limit. |
 | `SPARK_APP_NAME` | `nl-regex-engine` | Spark application name prefix. |
+| `SPARK_WARMUP` | `true` | Boot the Spark JVM/session in each Celery worker child at startup so the first job finds a hot session instead of stalling on the ~10–15 s cold JVM start. Set `false` to defer boot to the first job. |
 | `SPARK_WORKER_CORES` | `2` | (cluster profile) cores for the standalone Spark worker. |
 | `SPARK_WORKER_MEMORY` | `2g` | (cluster profile) memory for the standalone Spark worker. |
 

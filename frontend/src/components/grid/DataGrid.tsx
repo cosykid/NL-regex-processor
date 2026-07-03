@@ -45,17 +45,18 @@ export default function DataGrid({
 }: Props) {
   const targetSet = new Set(targets);
 
-  // Infer a cosmetic type per column from the visible rows (unless the parent
-  // already computed the shared map).
-  const computed = useMemo(() => {
+  // Infer a cosmetic type per column from the visible rows — but only when the
+  // parent didn't already compute the shared map (skips a per-render pass over
+  // every visible cell).
+  const types = useMemo(() => {
+    if (typesProp) return typesProp;
     const m: Record<string, ColumnType> = {};
     for (const c of columns) m[c] = inferType(c, rows.map((r) => r?.[c]));
     return m;
-  }, [columns, rows]);
-  const types = typesProp || computed;
+  }, [typesProp, columns, rows]);
 
   return (
-    <table className="grid">
+    <table className="grid" aria-label="Data">
       <thead>
         <tr>
           <th className="gutter" />
@@ -66,7 +67,17 @@ export default function DataGrid({
               <th key={c} className={on ? "target" : ""}>
                 <div
                   className="colhead"
+                  role={onToggleTarget ? "button" : undefined}
+                  tabIndex={onToggleTarget ? 0 : undefined}
+                  aria-pressed={onToggleTarget ? on : undefined}
                   onClick={() => onToggleTarget && onToggleTarget(c)}
+                  onKeyDown={(e) => {
+                    if (!onToggleTarget) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onToggleTarget(c);
+                    }
+                  }}
                   title={
                     onToggleTarget
                       ? on
@@ -124,7 +135,7 @@ export default function DataGrid({
                   key={c}
                   className={`${targetSet.has(c) ? "target" : ""} ${
                     isSel ? "sel" : ""
-                  }`}
+                  } ${types[c]?.align === "right" ? "num" : ""}`}
                   onClick={() =>
                     onSelectCell && onSelectCell(`${i}:${c}`, `R${rowNo} · ${c}`)
                   }

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import ImportView from "./components/ImportView";
 import Sidebar from "./components/Sidebar";
 import Composer from "./components/Composer";
@@ -23,6 +24,8 @@ export default function App() {
     setPrompt,
     replacement,
     setReplacement,
+    action,
+    setAction,
     targets,
     focusSignal,
     error,
@@ -31,6 +34,7 @@ export default function App() {
     selectedCell,
     cellRef,
     handleDataset,
+    reopen,
     toggleTarget,
     runTransformation,
     selectRun,
@@ -42,7 +46,26 @@ export default function App() {
 
   const restoring = useSessionRestore({ setDataset, setRuns });
 
+  // A file dropped outside a real drop target otherwise makes the browser
+  // navigate to it (looks like the app "ate" the file). Swallow those.
+  useEffect(() => {
+    const prevent = (e: DragEvent) => e.preventDefault();
+    window.addEventListener("dragover", prevent);
+    window.addEventListener("drop", prevent);
+    return () => {
+      window.removeEventListener("dragover", prevent);
+      window.removeEventListener("drop", prevent);
+    };
+  }, []);
+
   useJobPolling(runs, setRuns);
+
+  // Name the tab after the open file (matches index.html's default otherwise).
+  useEffect(() => {
+    document.title = dataset
+      ? `${dataset.original_name} — Find & replace`
+      : "Find & replace across your data";
+  }, [dataset]);
 
   /* ---- render ---- */
   if (restoring) {
@@ -60,7 +83,7 @@ export default function App() {
     return (
       <div className="app">
         <ThemeToggle theme={theme} onToggle={toggleTheme} className="floating" />
-        <ImportView onDataset={handleDataset} />
+        <ImportView onDataset={handleDataset} onReopen={reopen} />
       </div>
     );
   }
@@ -82,6 +105,8 @@ export default function App() {
             setPrompt={setPrompt}
             replacement={replacement}
             setReplacement={setReplacement}
+            action={action}
+            setAction={setAction}
             targets={targets}
             onToggleTarget={toggleTarget}
             onRun={runTransformation}

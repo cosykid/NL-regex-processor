@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { fmtBytes, fmtInt, timeAgo } from "../lib/format";
 import { prettyStage } from "../lib/stage";
 import { TERMINAL } from "../lib/constants";
@@ -25,12 +26,20 @@ export default function Sidebar({
   onNewRun,
   onImportAnother,
 }: Props) {
+  // Re-render every 30s so the relative "…ago" stamps don't go stale once
+  // polling stops (finished runs otherwise read "just now" forever).
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 30_000);
+    return () => clearInterval(t);
+  }, []);
+
   return (
     <aside className="sidebar">
       <div className="ds-card">
         <div className="eyebrow ds-eyebrow">File</div>
         <div className="ds-name">
-          <span className="fi">▦</span>
+          <span className="fi" aria-hidden="true">▦</span>
           <span>{dataset.original_name}</span>
         </div>
         <div className="ds-meta">
@@ -76,6 +85,8 @@ export default function Sidebar({
                 key={r.id}
                 className={`run ${activeRunId === r.id ? "active" : ""}`}
                 onClick={() => onSelectRun(r)}
+                title={r.nl_prompt || undefined}
+                aria-current={activeRunId === r.id ? "true" : undefined}
               >
                 <div className="run-top">
                   <span className={`run-dot ${st}`} />

@@ -50,9 +50,11 @@ def regex_cache_key(prompt: str, model: str, context: str = "") -> str:
     digest = hashlib.sha256(
         f"{model}::{normalised}::{context}".encode()
     ).hexdigest()
-    # v2: the key now folds in the data context (see module docstring). Bumping
-    # the version retires v1 entries, which were keyed on prompt+model only.
-    return f"regex:v2:{digest}"
+    # v3: cached payloads are now a predicate set ({predicates, combinator, ...})
+    # rather than a single {pattern, ...}. Bumping the version retires the
+    # differently-shaped v2 entries (which folded in the data context) and v1
+    # (prompt+model only), so a stale entry can't be misread by the new reader.
+    return f"regex:v3:{digest}"
 
 
 def get_cached_regex(prompt: str, model: str, context: str = "") -> Optional[dict]:
@@ -81,6 +83,33 @@ def set_cached_regex(
         )
     except redis.RedisError as exc:  # pragma: no cover - degrade gracefully
         logger.warning("Regex cache write failed: %s", exc)
+
+
+# --------------------------------------------------------------------------- #
+# Pending presigned uploads
+# --------------------------------------------------------------------------- #
+# When a client uploads straight to S3 via a presigned URL, we stash the
+# upload's server-decided metadata (name/kind/locator) here at presign time and
+# look it up on completion. This keeps the client from dictating the storage
+# key or file kind — it only echoes back an opaque id.
+def _pending_upload_key(upload_id) -> str:
+    return f"upload:pending:{upload_id}"
+
+
+def set_pending_upload(upload_id, data: dict, ttl: int) -> None:
+    get_client().set(_pending_upload_key(upload_id), json.dumps(data), ex=ttl)
+
+
+def get_pending_upload(upload_id) -> Optional[dict]:
+    raw = get_client().get(_pending_upload_key(upload_id))
+    return json.loads(raw) if raw else None
+
+
+def clear_pending_upload(upload_id) -> None:
+    try:
+        get_client().delete(_pending_upload_key(upload_id))
+    except redis.RedisError:  # pragma: no cover
+        pass
 
 
 # --------------------------------------------------------------------------- #
