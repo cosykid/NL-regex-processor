@@ -1,7 +1,8 @@
-# Terraform — S3 object storage for the NL-Regex processor
+# Terraform — AWS infrastructure for the NL-Regex processor
 
-Provisions the AWS side of file storage: a locked-down **S3 bucket** for uploads
-and Spark results, plus **least-privilege IAM** for the app to reach it.
+Provisions the whole AWS side: a locked-down **S3 bucket** with
+**least-privilege IAM**, the **EC2 host** the backend stack deploys to, and
+**spend guardrails** (an AWS Budget with an automatic instance stop).
 
 The app authenticates with the **default AWS credential provider chain**, so the
 *same* container talks to S3 via static keys locally and via an IAM role when
@@ -17,6 +18,12 @@ deployed — no code changes between the two.
 | `aws_iam_policy.bucket_access` | Least-privilege read/write **to this bucket only**. |
 | `aws_iam_role.app` (+ instance profile) | Runtime identity for the **deployed** app (ECS/EC2/EKS). |
 | `aws_iam_user.dev` (+ access key) | Static keys for **local** development. Toggle with `create_dev_user`. |
+| `aws_instance.app` + EIP + SG + key pair (`ec2.tf`) | The Docker Compose host (t4g.large, arm64, Docker via cloud-init, IMDS hop limit 2 so containers reach the role). **Created only when `ssh_public_key` is set.** |
+| `aws_budgets_budget.monthly` + stop action (`budget.tf`) | Gross-spend budget with email alerts (50/80/100%) and an automatic instance **stop at 90%**. **Created only when `budget_alert_email` is set.** |
+
+The CI/CD pipeline that deploys onto the EC2 host — and the full explanation of
+the budget auto-stop chain and its limits — is documented in
+[docs/cicd.md](../../docs/cicd.md).
 
 ## Usage
 
@@ -71,7 +78,15 @@ state bucket + enable the `backend "s3"` block in `versions.tf`, then
 
 ## Teardown
 
+Two levels:
+
 ```bash
+# Pause: destroy ONLY the EC2 host (instance, EIP, SG, key pair) — the bucket,
+# IAM, and budget survive. Backs up the server .env first. Compute is the only
+# real cost, so this takes the bill to ~zero between sessions.
+../../scripts/infra-down.sh        # resume later with ../../scripts/infra-up.sh
+
+# Everything:
 terraform destroy
 ```
 

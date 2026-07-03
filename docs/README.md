@@ -15,6 +15,7 @@ Platform**. For a high-level overview and quick start, see the
 | [Configuration](configuration.md) | All environment variables and compose profiles |
 | [Development](development.md) | Local setup (with/without Docker), tests, project layout |
 | [Deployment & operations](deployment.md) | Deploying, scaling, the Spark cluster, observability, hardening |
+| [CI/CD & the live deployment](cicd.md) | The GitHub Actions pipeline, EC2 + Vercel topology, spend guardrails (budget auto-stop), bot hardening, pause/resume ops |
 | [Demo](demo.md) | Demo-video shot list |
 | [Requirements](requirements.md) | The original assessment brief (objective + requirements) |
 

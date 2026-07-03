@@ -1,5 +1,11 @@
 # Deployment & operations
 
+> **Looking for how this project is actually deployed?** The live setup —
+> GitHub Actions pipeline, EC2 + Vercel topology, budget auto-stop, bot
+> hardening, pause/resume scripts — is documented in [cicd.md](cicd.md).
+> This doc covers deploying the images to any generic Docker host or managed
+> platform.
+
 ## Deploy with docker-compose
 
 The same images deploy to any Docker host.

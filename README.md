@@ -41,7 +41,8 @@ In-depth documentation lives in [`docs/`](docs/README.md):
 [data model](docs/data-model.md) ·
 [configuration](docs/configuration.md) ·
 [development](docs/development.md) ·
-[deployment & operations](docs/deployment.md).
+[deployment & operations](docs/deployment.md) ·
+[CI/CD & the live deployment](docs/cicd.md).
 
 ---
 
@@ -441,7 +442,16 @@ covered by the suite above.
 
 ## Deployment
 
-The same images deploy to any Docker host:
+**This project is live:** the frontend is served from
+[nl-regex-processor.vercel.app](https://nl-regex-processor.vercel.app) (Vercel),
+and the backend stack (gunicorn + Celery/Spark worker + Redis) runs on an ARM
+EC2 instance behind Vercel's server-side `/api` rewrite. Every push to `main`
+runs tests, builds the arm64 image to GHCR, and deploys both halves via GitHub
+Actions. The pipeline, Terraform, spend guardrails (an AWS Budget that
+auto-stops the instance at 90% of the monthly limit), bot hardening, and
+pause/resume scripts are documented in [docs/cicd.md](docs/cicd.md).
+
+For any other Docker host, the generic recipe:
 
 1. Set production env in `.env` (`DJANGO_DEBUG=False`, a strong
    `DJANGO_SECRET_KEY`, restricted `DJANGO_ALLOWED_HOSTS`, real Postgres
