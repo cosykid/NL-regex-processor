@@ -278,7 +278,10 @@
   background: var(--matched-bg);
 }
 .grid tbody tr.matched td.gutter {
-  background: var(--matched-bg);
+  /* keep the sticky gutter opaque: composite the translucent matched tint
+     over the solid gutter base so scrolled-under cells can't bleed through */
+  background-color: var(--surface-2);
+  background-image: linear-gradient(var(--matched-bg), var(--matched-bg));
   color: var(--signal-deep);
   box-shadow: inset 3px 0 0 var(--matched-bar);
 }
