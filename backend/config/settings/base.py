@@ -85,6 +85,17 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "api.pagination.DefaultPagination",
     "PAGE_SIZE": 50,
+    # Anonymous per-IP rate limit, stored in the (Redis) default cache. A rate
+    # of None disables throttling entirely — dev and the test suite run
+    # unthrottled; production sets API_ANON_THROTTLE (e.g. "60/min") in
+    # docker-compose.prod.yml. This is the cap on drive-by API abuse: every
+    # job POST is a potential LLM call + Spark run.
+    "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.AnonRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {"anon": os.environ.get("API_ANON_THROTTLE") or None},
+    # Exactly one trusted proxy (Vercel's rewrite) sits in front when deployed,
+    # so throttle on the client hop of X-Forwarded-For, not the proxy's IP —
+    # otherwise all real users share one bucket.
+    "NUM_PROXIES": 1,
 }
 
 # --------------------------------------------------------------------------- #

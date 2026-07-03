@@ -13,3 +13,6 @@ crash.*.log
 
 # Plan output can contain secrets.
 *.tfplan
+
+# Runtime .env snapshot pulled off the EC2 box by scripts/infra-down.sh.
+.env.backup

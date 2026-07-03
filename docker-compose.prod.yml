@@ -1,0 +1,87 @@
+# Production stack for the EC2 host — SELF-CONTAINED, no build contexts.
+# The deploy workflow copies this file to /opt/nl-regex/docker-compose.yml on
+# the instance and runs it against images CI pushed to GHCR.
+#
+# The frontend is NOT here — it deploys to Vercel, whose rewrites proxy /api
+# and /healthz to this host (see frontend/vercel.json). Gunicorn is published
+# on port 80 directly; large files never pass through it (browser uploads go
+# straight to S3 via presigned URLs).
+#
+# On the instance, /opt/nl-regex/.env supplies both compose interpolation and
+# the app's secrets:
+#
+#   IMAGE_TAG=<git sha>        # pinned by each deploy (sed-replaced)
+#   DJANGO_SECRET_KEY=...      # required — compose refuses to start without it
+#   DJANGO_ALLOWED_HOSTS=<dashed-ip>.nip.io,localhost
+#   DATABASE_URL=postgres://...neon.tech/...   # Neon
+#   ANTHROPIC_API_KEY=...
+#   STORAGE_BACKEND=s3
+#   S3_BUCKET=<terraform output bucket_name>
+#
+# ALLOWED_HOSTS doubles as the bot filter: Vercel's rewrite targets the
+# instance via <dashed-ip>.nip.io (e.g. 3-25-10-7.nip.io — wildcard DNS that
+# resolves to the IP), so legit requests arrive with that Host header, while
+# scanners hitting the raw IP send Host: <ip> and get a cheap 400 before any
+# DB/S3/LLM work. `localhost` must stay in the list — the container
+# healthcheck curls http://localhost:8000/healthz.
+#
+# No AWS keys here: the instance profile provides credentials via IMDS (the
+# Terraform config sets hop limit 2 so containers can reach it).
+
+x-backend-env: &backend-env
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set DJANGO_SECRET_KEY in /opt/nl-regex/.env}
+  DJANGO_DEBUG: "False"
+  DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+  DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL (Neon) in /opt/nl-regex/.env}
+  REDIS_URL: redis://redis:6379
+  DATA_DIR: /data
+  STORAGE_BACKEND: ${STORAGE_BACKEND:-s3}
+  S3_BUCKET: ${S3_BUCKET:-}
+  S3_REGION: ${S3_REGION:-ap-southeast-2}
+  AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  LLM_MODEL: ${LLM_MODEL:-claude-haiku-4-5}
+  SPARK_MASTER_URL: ${SPARK_MASTER_URL:-local[*]}
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: ghcr.io/cosykid/nl-regex-processor-backend:${IMAGE_TAG:-latest}
+    command: ["web"]
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      # gunicorn is internet-facing here (no nginx buffer): threaded workers +
+      # a short keep-alive so slow/idle bot connections can't pin the workers.
+      GUNICORN_CMD_ARGS: "--worker-class gthread --threads 8 --keep-alive 5"
+      # Per-IP anonymous rate limit (see settings/base.py). Empty disables.
+      API_ANON_THROTTLE: ${API_ANON_THROTTLE:-60/min}
+    ports:
+      - "80:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    image: ghcr.io/cosykid/nl-regex-processor-backend:${IMAGE_TAG:-latest}
+    command: ["worker"]
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      CELERY_CONCURRENCY: ${CELERY_CONCURRENCY:-2}
+    depends_on:
+      redis:
+        condition: service_healthy

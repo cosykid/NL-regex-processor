@@ -113,3 +113,47 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+# --- EC2 host (see ec2.tf) ---------------------------------------------------
+variable "ssh_public_key" {
+  description = "SSH public key for the deploy user (contents of ~/.ssh/id_ed25519.pub). EMPTY (the default) skips creating the EC2 instance entirely."
+  type        = string
+  default     = ""
+}
+
+variable "instance_type" {
+  description = "EC2 instance type. Must be ARM/Graviton (t4g.*, m7g.*, …) — CI builds linux/arm64 images."
+  type        = string
+  default     = "t4g.large"
+}
+
+variable "ssh_ingress_cidr" {
+  description = "CIDRs allowed to SSH in. GitHub-hosted runners have no fixed IPs, so the practical default is open; narrow it if you deploy from a fixed egress."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "root_volume_gb" {
+  description = "Root EBS volume size. Docker images (the backend one carries a JRE + Spark jars) plus their build layers need headroom over the 8 GB default."
+  type        = number
+  default     = 30
+}
+
+# --- spend guardrails (see budget.tf) ----------------------------------------
+variable "budget_alert_email" {
+  description = "Email for budget alerts. EMPTY (the default) skips creating the budget entirely."
+  type        = string
+  default     = ""
+}
+
+variable "budget_limit_usd" {
+  description = "Monthly GROSS-spend budget in USD (credits excluded from the measurement — set this at or below your remaining free-plan credit balance)."
+  type        = number
+  default     = 100
+}
+
+variable "budget_auto_stop" {
+  description = "Automatically STOP the EC2 instance at 90% of the budget (email alerts fire regardless). Stop, not terminate — EBS + idle EIP still bill pennies."
+  type        = bool
+  default     = true
+}

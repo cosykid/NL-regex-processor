@@ -28,6 +28,16 @@ output "app_instance_profile_name" {
   value       = aws_iam_instance_profile.app.name
 }
 
+output "instance_public_ip" {
+  description = "Elastic IP of the EC2 host (use as the DEPLOY_HOST secret). Null until ssh_public_key is set and the instance is applied."
+  value       = try(aws_eip.app[0].public_ip, null)
+}
+
+output "ssh_command" {
+  description = "Ready-made SSH command for the EC2 host."
+  value       = try("ssh ubuntu@${aws_eip.app[0].public_ip}", null)
+}
+
 output "dev_access_key_id" {
   description = "Access key id for LOCAL development (only when create_dev_user = true). Read with: terraform output -raw dev_access_key_id"
   value       = try(aws_iam_access_key.dev[0].id, null)

@@ -1,0 +1,195 @@
+# CI/CD
+#
+#   PRs + pushes to main → backend pytest (inside the arm64 image, against a
+#                          Neon test database) + frontend type-check/build.
+#   pushes to main only  → push the backend image to GHCR (linux/arm64),
+#                          SSH-deploy the compose stack to the EC2 host,
+#                          and ship the frontend to Vercel.
+#
+# Everything image-shaped runs on ubuntu-24.04-arm (free for public repos):
+# native arm64 — the same architecture as the t4g.large — so no QEMU emulation.
+#
+# Required repository secrets:
+#   TEST_DATABASE_URL   Neon connection string for CI tests (use a Neon branch,
+#                       NOT the production database)
+#   DEPLOY_HOST         Elastic IP — `terraform output -raw instance_public_ip`
+#   DEPLOY_SSH_KEY      private key matching terraform's ssh_public_key
+#   VERCEL_TOKEN        vercel.com → Account Settings → Tokens
+#   VERCEL_ORG_ID       from frontend/.vercel/project.json after `vercel link`
+#   VERCEL_PROJECT_ID   from frontend/.vercel/project.json after `vercel link`
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: # manual redeploy, e.g. after scripts/infra-up.sh
+
+# One pipeline per ref; abandon superseded PR runs but never a deploy mid-roll.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/nl-regex-processor-backend
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-24.04-arm
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build once here, cached to GHA; the push job below reuses the layers.
+      - name: Build backend image (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          load: true
+          tags: backend-under-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The image's entrypoint execs any unknown command, so pytest runs with
+      # the exact runtime deps (JRE, Spark jars) that production ships.
+      - name: pytest
+        run: |
+          docker run --rm --network host \
+            -e DATABASE_URL='${{ secrets.TEST_DATABASE_URL }}' \
+            -e REDIS_URL='redis://localhost:6379' \
+            -e DJANGO_SECRET_KEY='ci-only-not-secret' \
+            backend-under-test python -m pytest
+
+  frontend-checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      # package.json's build = tsc over both tsconfigs + vite build.
+      - run: npm run build
+
+  build-push:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [backend-tests, frontend-checks]
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push backend image (arm64)
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-backend:
+    needs: build-push
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts
+
+      # Pin the deployed tag in /opt/nl-regex/.env so a later manual
+      # `docker compose up -d` on the box re-runs the same sha, not :latest.
+      # The GHCR login uses the run's ephemeral GITHUB_TOKEN, so pulls work
+      # even while the package is private.
+      - name: Deploy compose stack
+        run: |
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml \
+            "ubuntu@${{ secrets.DEPLOY_HOST }}:/opt/nl-regex/docker-compose.yml"
+          ssh -i ~/.ssh/deploy_key "ubuntu@${{ secrets.DEPLOY_HOST }}" "
+            set -euo pipefail
+            cd /opt/nl-regex
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+            touch .env
+            sed -i '/^IMAGE_TAG=/d' .env
+            echo 'IMAGE_TAG=${{ github.sha }}' >> .env
+            docker compose pull -q
+            docker compose up -d --remove-orphans
+            docker image prune -af
+          "
+
+      # ALLOWED_HOSTS only admits the nip.io name (bot filter), so the probe
+      # must send that Host header — a bare-IP curl gets a 400 by design.
+      - name: Health check
+        run: |
+          NIP="$(echo '${{ secrets.DEPLOY_HOST }}' | tr . -).nip.io"
+          for i in $(seq 1 30); do
+            if curl -fsS -H "Host: $NIP" "http://${{ secrets.DEPLOY_HOST }}/healthz"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'backend never became healthy' >&2
+          exit 1
+
+  deploy-frontend:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [backend-tests, frontend-checks]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm i -g vercel@latest
+
+      - run: vercel pull --yes --environment=production --token='${{ secrets.VERCEL_TOKEN }}'
+
+      - run: vercel build --prod --token='${{ secrets.VERCEL_TOKEN }}'
+
+      - run: vercel deploy --prebuilt --prod --token='${{ secrets.VERCEL_TOKEN }}'

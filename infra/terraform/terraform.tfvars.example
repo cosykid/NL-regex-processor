@@ -39,3 +39,19 @@ abort_incomplete_multipart_days    = 7
 # EKS IRSA example:
 # oidc_provider_arn = "arn:aws:iam::123456789012:oidc-provider/oidc.eks.ap-southeast-2.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE"
 # oidc_subjects     = ["system:serviceaccount:default:nl-regex"]
+
+# --- EC2 host (CI/CD deploy target) ---
+# Setting ssh_public_key CREATES the instance (empty = skipped entirely).
+# ssh_public_key   = "ssh-ed25519 AAAA... you@laptop"
+# instance_type    = "t4g.large"        # ARM only — CI ships linux/arm64 images
+# ssh_ingress_cidr = ["0.0.0.0/0"]      # narrow if you deploy from a fixed IP
+# root_volume_gb   = 30
+
+# --- spend guardrails ---
+# Setting budget_alert_email CREATES a monthly AWS Budget (empty = skipped).
+# Tracks GROSS spend (credits excluded) — set the limit at/below your
+# remaining free-plan credits. Alerts at 50%/80%/100%; auto-STOPS the EC2
+# instance at 90% unless budget_auto_stop = false.
+# budget_alert_email = "you@example.com"
+# budget_limit_usd   = 100
+# budget_auto_stop   = true
