@@ -54,7 +54,11 @@ def regex_cache_key(prompt: str, model: str, context: str = "") -> str:
     # rather than a single {pattern, ...}. Bumping the version retires the
     # differently-shaped v2 entries (which folded in the data context) and v1
     # (prompt+model only), so a stale entry can't be misread by the new reader.
-    return f"regex:v3:{digest}"
+    # v4: the connector-classification prompt now distinguishes a conditional
+    # gate ("if A ..., also redact its B" -> `all`) from independent per-column
+    # edits (-> `any`); v3 entries for gated prompts hold the wrong `any`
+    # combinator, so retire them.
+    return f"regex:v4:{digest}"
 
 
 def get_cached_regex(prompt: str, model: str, context: str = "") -> Optional[dict]:

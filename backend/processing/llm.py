@@ -114,13 +114,33 @@ _CORE_PROMPT = (
     "- If the description states ONE condition but does not say which column it "
     "applies to, emit one predicate per target column with the same pattern and "
     "set `combinator` to `any` (match if it appears in any of them).\n"
-    "- When the description gives a SEPARATE condition and outcome for EACH column "
-    "(e.g. \"if A is blank set it to 0, if B is blank set it to 0\", or \"redact "
-    "emails in A and phones in B\"), the columns are handled independently: emit "
-    "one predicate per named column and set `combinator` to `any`. Each column is "
-    "then edited on its own. Reserve `all` for a single row-level condition that "
-    "every column must satisfy together (e.g. \"rows where name starts with A AND "
-    "phone starts with 0\").\n"
+    "- When the description gives a SEPARATE, SELF-CONTAINED condition and outcome "
+    "for EACH column — each column's edit depending only on THAT column's own "
+    "condition (e.g. \"if A is blank set it to 0, if B is blank set it to 0\", or "
+    "\"redact emails in A and phones in B\") — the columns are handled "
+    "independently: emit one predicate per named column and set `combinator` to "
+    "`any`. Each column is then edited on its own.\n"
+    "- When ONE column states a condition and the outcome is applied to ANOTHER "
+    "column BECAUSE that condition holds (\"if distance is 0, redact its county\", "
+    "\"when status is closed, clear the note\", \"for rows where A is blank, set B "
+    "to N/A\"), the columns are NOT independent — the edit to the target column is "
+    "gated by the condition column. You MUST emit TWO predicates: one for the "
+    "condition column (the test, e.g. `^0\\.0$`) AND one for the target column "
+    "(matching the text to edit, e.g. `^.+$` for the whole cell). Never drop the "
+    "target-column predicate — without it the target is never edited — even though "
+    "its outcome is named by a different verb (\"redact\" / \"clear\" / \"set\") "
+    "than the condition. The single action and value apply to every predicate "
+    "column, so under `replace` with value \"nil\" both columns become \"nil\" in "
+    "the gated rows, which is the intended redaction. Set `combinator` to `all` so "
+    "the edit fires ONLY in the rows the condition selects. `any` here would leak "
+    "the edit to every row, because a whole-cell pattern like `^.+$` matches on "
+    "its own. "
+    "Signals of this gated case, even when \"also\" or \"and\" is present: \"if\" / "
+    "\"when\" / \"for rows where\", or a possessive like \"its\" / \"their\" "
+    "referring back to the conditioned row.\n"
+    "- Reserve `all` for these gated cases and for a single row-level condition "
+    "that every column must satisfy together (e.g. \"rows where name starts with A "
+    "AND phone starts with 0\").\n"
     "Pattern rules:\n"
     "- To match an EMPTY, blank, missing, or null cell, use `^\\s*$` — a "
     "missing/null value is treated as an empty string, so this fires on blank "
@@ -472,6 +492,11 @@ def _generate_conditions_with_llm(
         response = client.messages.create(
             model=settings.LLM_MODEL,
             max_tokens=settings.LLM_MAX_TOKENS,
+            # Deterministic: predicate/combinator resolution is a classification,
+            # not a creative task. temperature=0 makes the same prompt resolve the
+            # same way every run (no occasional dropped predicate) and keeps the
+            # Redis cache meaningful.
+            temperature=0,
             system=system,
             messages=[{"role": "user", "content": user_msg}],
             output_config={

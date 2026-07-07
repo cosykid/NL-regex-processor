@@ -63,7 +63,7 @@ def test_cache_key_folds_in_context():
     base = cache.regex_cache_key("remove False", "m")
     with_ctx = cache.regex_cache_key("remove False", "m", "ctx")
     assert base != with_ctx
-    assert with_ctx.startswith("regex:v3:")
+    assert with_ctx.startswith("regex:v4:")
 
 
 # --------------------------------------------------------------------------- #
